@@ -345,6 +345,11 @@ export class RunnerLoopSystem {
       : runnerConfig.jump.holdMaxSeconds;
     this.jumpsUsed = isAirJump ? this.jumpsUsed + 1 : 1;
 
+    audioCueBus.emit({
+      type: 'jump_player',
+      intensity: isAirJump ? 1.4 : 1.0
+    });
+
     if (isAirJump) {
       this.collectBurst = Math.max(this.collectBurst, 0.18);
       this.chainBurst = Math.max(this.chainBurst, 0.06);
@@ -404,38 +409,54 @@ export class RunnerLoopSystem {
     const definition = collectibleDefinitions[variant];
     const container = this.scene.add.container(0, 0).setDepth(definition.depth);
     const halo = this.scene.add
-      .ellipse(0, 0, 42, 42, mood.sparkColor, mood.sparkHaloAlpha)
+      .ellipse(0, 0, 38, 38, mood.sparkColor, mood.sparkHaloAlpha * 0.88)
       .setBlendMode(Phaser.BlendModes.ADD);
 
     const primary: PaintableShape[] = [];
     const secondary: PaintableShape[] = [];
 
     if (variant === 'spark') {
-      primary.push(this.scene.add.ellipse(0, 0, 12, 12, mood.sparkColor, 1));
+      primary.push(
+        this.scene.add.ellipse(0, 3, 18, 16, mood.sparkColor, 1),
+        this.scene.add.triangle(-10, -6, -8, 2, 0, -10, 2, 4, mood.sparkColor, 1).setRotation(-0.26),
+        this.scene.add.triangle(10, -6, -2, 4, 0, -10, 8, 2, mood.sparkColor, 1).setRotation(0.26),
+        this.scene.add.ellipse(0, 10, 24, 10, mood.sparkColor, 1),
+        this.scene.add.triangle(0, 17, -4, -2, 0, 4, 4, -2, mood.sparkColor, 1)
+      );
       secondary.push(
-        this.scene.add.rectangle(0, -10, 4, 12, mood.markerColor, 1).setRotation(0.18),
-        this.scene.add.rectangle(9, 0, 12, 4, mood.markerColor, 1).setRotation(-0.12),
-        this.scene.add.rectangle(0, 10, 4, 12, mood.markerColor, 1).setRotation(0.16),
-        this.scene.add.rectangle(-9, 0, 12, 4, mood.markerColor, 1).setRotation(-0.1)
+        this.scene.add.ellipse(0, 3, 8, 8, 0xffffff, 1),
+        this.scene.add.ellipse(0, -5, 4, 4, 0xffffff, 1),
+        this.scene.add.ellipse(0, 11, 5, 3, 0xf8fff0, 0.9)
       );
     }
 
     if (variant === 'note') {
       primary.push(
-        this.scene.add.ellipse(-3, 4, 12, 10, mood.sparkColor, 1),
-        this.scene.add.rectangle(5, -8, 4, 24, mood.sparkColor, 1),
-        this.scene.add.triangle(12, -14, 0, 0, 10, 4, 0, 11, mood.sparkColor, 1)
+        this.scene.add.ellipse(0, 2, 18, 24, mood.sparkColor, 1),
+        this.scene.add.rectangle(0, 12, 14, 8, mood.sparkColor, 1),
+        this.scene.add.triangle(0, -14, -7, 3, 0, -8, 7, 3, mood.sparkColor, 1),
+        this.scene.add.triangle(-9, -2, -4, 5, 0, -6, 3, 6, mood.sparkColor, 1).setRotation(-0.22),
+        this.scene.add.triangle(9, -2, -3, 6, 0, -6, 4, 5, mood.sparkColor, 1).setRotation(0.22)
       );
-      secondary.push(this.scene.add.rectangle(-8, 12, 8, 3, mood.markerColor, 0.9));
+      secondary.push(
+        this.scene.add.ellipse(0, 2, 8, 10, 0xffffff, 1),
+        this.scene.add.ellipse(2, 1, 3, 3, 0xffffff, 1),
+        this.scene.add.rectangle(0, 13, 6, 2, 0xf8fff0, 0.9)
+      );
     }
 
     if (variant === 'brush') {
       primary.push(
-        this.scene.add.rectangle(-2, 0, 20, 5, mood.sparkColor, 1).setRotation(-0.32),
-        this.scene.add.rectangle(10, -6, 8, 8, mood.sparkColor, 1).setRotation(-0.32),
-        this.scene.add.triangle(15, -12, -4, 4, 8, 0, 0, -9, mood.sparkColor, 1).setRotation(-0.22)
+        this.scene.add.ellipse(-6, 6, 16, 12, mood.sparkColor, 1),
+        this.scene.add.rectangle(6, -2, 20, 6, mood.sparkColor, 1).setRotation(-0.56),
+        this.scene.add.triangle(15, -13, -6, 4, 6, 0, 0, -9, mood.sparkColor, 1).setRotation(-0.18),
+        this.scene.add.triangle(-14, 13, -5, -2, 5, -1, 0, 6, mood.sparkColor, 1).setRotation(0.2)
       );
-      secondary.push(this.scene.add.rectangle(-12, 7, 10, 3, mood.markerColor, 0.92).setRotation(-0.32));
+      secondary.push(
+        this.scene.add.ellipse(-6, 6, 6, 6, 0xffffff, 1),
+        this.scene.add.rectangle(8, -4, 8, 2, 0xffffff, 1).setRotation(-0.56),
+        this.scene.add.rectangle(-11, 11, 6, 2, 0xf8fff0, 0.9).setRotation(0.2)
+      );
     }
 
     container.add([halo, ...primary, ...secondary]);
@@ -473,61 +494,56 @@ export class RunnerLoopSystem {
 
     if (variant === 'sludge') {
       primary.push(
-        this.scene.add.ellipse(-4, 14, 42, 8, 0x24150b, 0.34),
-        this.scene.add.ellipse(-4, 10, 34, 14, 0x5f3a1f, 0.96),
-        this.scene.add.ellipse(-3, 0, 26, 14, 0x6d4324, 0.96),
-        this.scene.add.ellipse(2, -10, 18, 12, 0x784929, 0.96),
-        this.scene.add.triangle(8, -19, -6, 3, 0, -8, 7, 4, 0x7f502d, 0.96)
+        this.scene.add.rectangle(0, 12, 36, 14, 0x3e4c59, 1),
+        this.scene.add.triangle(-6, -2, -12, 14, 12, 14, -6, -8, 0x52606d, 1),
+        this.scene.add.rectangle(8, 2, 16, 12, 0x52606d, 1).setRotation(0.2),
+        this.scene.add.rectangle(-12, 4, 14, 18, 0x616e7c, 1).setRotation(-0.15),
+        this.scene.add.triangle(15, 4, -4, 9, 4, 0, 0, -8, 0x607284, 1).setRotation(0.14)
       );
       secondary.push(
-        this.scene.add.ellipse(-2, 14, 24, 4, 0x120b07, 0.32),
-        this.scene.add.ellipse(-7, -12, 7, 4, 0xa56e43, 0.9),
-        this.scene.add.ellipse(3, -7, 6, 4, 0xa56e43, 0.86),
-        this.scene.add.ellipse(8, -13, 4, 3, 0xf6d9ba, 0.32),
-        this.scene.add.ellipse(12, -1, 5, 3, 0x3a2413, 0.34),
-        this.scene.add.ellipse(-15, 12, 8, 4, 0xf8f1e5, 0.12)
+        this.scene.add.rectangle(-6, 0, 4, 12, 0x9aa5b1, 1).setRotation(0.4),
+        this.scene.add.rectangle(8, -4, 18, 4, 0x7b8794, 1).setRotation(-0.3),
+        this.scene.add.ellipse(-16, 14, 6, 4, 0x323f4b, 1),
+        this.scene.add.ellipse(14, 16, 12, 4, 0x1f2933, 1),
+        this.scene.add.rectangle(10, 6, 7, 2, 0xd5dde2, 0.85).setRotation(-0.22)
       );
     }
 
     if (variant === 'warden') {
       primary.push(
-        this.scene.add.ellipse(0, 20, 34, 8, 0x13111a, 0.32),
-        this.scene.add.rectangle(0, 6, 24, 30, mood.shadowColor, 0.94),
-        this.scene.add.rectangle(0, -3, 28, 8, mood.shadowColor, 0.94),
-        this.scene.add.ellipse(0, -18, 18, 17, mood.shadowColor, 0.94),
-        this.scene.add.triangle(0, -10, -14, 3, 0, -14, 14, 3, mood.shadowColor, 0.94),
-        this.scene.add.rectangle(-9, -2, 7, 18, mood.shadowColor, 0.94),
-        this.scene.add.rectangle(9, -2, 7, 18, mood.shadowColor, 0.94)
+        this.scene.add.ellipse(0, 20, 40, 8, 0x13111a, 0.4),
+        this.scene.add.rectangle(0, 8, 34, 12, 0x3a2a2a, 1).setRotation(0.04),
+        this.scene.add.rectangle(-2, -4, 30, 14, 0x2a303a, 1).setRotation(-0.06),
+        this.scene.add.rectangle(3, -18, 28, 16, 0x4a2a2a, 1).setRotation(0.08),
+        this.scene.add.triangle(0, -32, -12, 6, 12, 6, 0, -8, 0x1a1a2a, 1),
+        this.scene.add.rectangle(-16, 4, 6, 14, 0x33262f, 1).setRotation(-0.1),
+        this.scene.add.rectangle(16, 6, 6, 14, 0x33262f, 1).setRotation(0.1)
       );
       secondary.push(
-        this.scene.add.rectangle(0, -29, 28, 6, mood.floorLineColor, 0.88),
-        this.scene.add.ellipse(0, -18, 6, 6, mood.markerColor, 0.88),
-        this.scene.add.rectangle(0, -9, 3, 10, mood.markerColor, 0.76),
-        this.scene.add.rectangle(0, -4, 16, 4, mood.markerColor, 0.24),
-        this.scene.add.rectangle(-7, 22, 6, 10, mood.floorLineColor, 0.9),
-        this.scene.add.rectangle(7, 22, 6, 10, mood.floorLineColor, 0.9),
-        this.scene.add.rectangle(0, 9, 10, 4, mood.markerColor, 0.32)
+        this.scene.add.rectangle(0, 8, 30, 4, 0xfff0e4, 0.9).setRotation(0.04),
+        this.scene.add.rectangle(-2, -4, 26, 4, 0xe4f0ff, 0.9).setRotation(-0.06),
+        this.scene.add.rectangle(3, -18, 24, 6, 0xffe4e4, 0.9).setRotation(0.08),
+        this.scene.add.ellipse(0, -28, 6, 6, 0xff3333, 0.8),
+        this.scene.add.rectangle(0, 18, 12, 2, 0xe7dfe4, 0.72)
       );
     }
 
     if (variant === 'hound') {
       primary.push(
-        this.scene.add.ellipse(-2, 18, 34, 8, 0x13100b, 0.28),
-        this.scene.add.ellipse(-4, 8, 30, 16, mood.shadowColor, 0.94),
-        this.scene.add.ellipse(12, -1, 18, 14, mood.shadowColor, 0.94),
-        this.scene.add.ellipse(21, 2, 10, 8, mood.shadowColor, 0.94),
-        this.scene.add.ellipse(3, 1, 10, 8, mood.shadowColor, 0.94)
+        this.scene.add.ellipse(-2, 18, 38, 8, 0x13111a, 0.4),
+        this.scene.add.rectangle(0, 6, 28, 16, 0x34495e, 1),
+        this.scene.add.triangle(18, -4, -10, 10, 6, 10, 8, -6, 0x2c3e50, 1),
+        this.scene.add.rectangle(-12, 14, 6, 14, 0x2c3e50, 1).setRotation(0.2),
+        this.scene.add.rectangle(8, 14, 6, 14, 0x2c3e50, 1).setRotation(-0.1),
+        this.scene.add.triangle(-2, -8, -5, 5, 0, -8, 5, 5, 0x25394e, 1)
       );
       secondary.push(
-        this.scene.add.rectangle(-4, -3, 18, 2, mood.markerColor, 0.38).setRotation(-0.06),
-        this.scene.add.triangle(7, -12, -3, 0, 3, -10, 8, 4, mood.floorLineColor, 0.92),
-        this.scene.add.triangle(17, -12, -3, 0, 3, -10, 8, 4, mood.floorLineColor, 0.92),
-        this.scene.add.triangle(-20, 2, -10, 0, -20, -8, -18, 9, mood.floorLineColor, 0.86),
-        this.scene.add.rectangle(-14, 17, 6, 8, mood.floorLineColor, 0.9),
-        this.scene.add.rectangle(0, 18, 6, 8, mood.floorLineColor, 0.9),
-        this.scene.add.rectangle(14, 15, 10, 2, mood.floorLineColor, 0.6).setRotation(0.24),
-        this.scene.add.ellipse(20, 1, 4, 4, mood.markerColor, 0.78),
-        this.scene.add.rectangle(14, 7, 7, 2, mood.markerColor, 0.42).setRotation(0.1)
+        this.scene.add.rectangle(4, 2, 24, 2, 0x7f8c8d, 1),
+        this.scene.add.ellipse(20, -2, 6, 6, 0xff3366, 0.9),
+        this.scene.add.triangle(-14, 0, -6, 8, 6, 8, -6, -4, 0x95a5a6, 1),
+        this.scene.add.rectangle(-12, 20, 8, 4, 0x1a252f, 1),
+        this.scene.add.rectangle(8, 20, 8, 4, 0x1a252f, 1),
+        this.scene.add.rectangle(8, -5, 8, 2, 0xd7e0e8, 0.74).setRotation(0.1)
       );
     }
 
@@ -721,49 +737,90 @@ export class RunnerLoopSystem {
 
   private paintCollectible(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const hoverScale = 1 + Math.sin(time * 0.005 + entity.worldX * 0.018) * 0.06;
-    entity.container.setScale(hoverScale + this.chainBurst * 0.04);
-    entity.halo?.setFillStyle(mood.sparkColor, mood.sparkHaloAlpha + this.chainBurst * 0.08);
-    this.paintShapes(entity.primary, mood.sparkColor, 0.97, mood.sparkEdgeColor, 0.34);
-    this.paintShapes(entity.secondary, mood.markerColor, 0.92, mood.sparkEdgeColor, 0.12);
+    const shellColor = 0xe9ead9;
+    const shellStroke = 0x657267;
+    const accentColor = 0xd4e7d0;
+    const highlightColor = 0xfaf7ed;
+    const applyPaint = (
+      shape: PaintableShape | undefined,
+      fillColor: number,
+      fillAlpha: number,
+      strokeColor: number,
+      strokeAlpha: number
+    ) => {
+      shape?.setFillStyle(fillColor, fillAlpha).setStrokeStyle(2, strokeColor, strokeAlpha);
+    };
+
+    entity.container.setScale((hoverScale + this.chainBurst * 0.032) * 1.14);
+    entity.halo?.setFillStyle(mood.sparkColor, mood.sparkHaloAlpha * 0.5 + this.chainBurst * 0.035);
+
+    if (entity.variant === 'spark') {
+      entity.primary.forEach((shape, index) => {
+        applyPaint(
+          shape,
+          index === 3 ? accentColor : shellColor,
+          0.96,
+          shellStroke,
+          index === 4 ? 0.18 : 0.24
+        );
+      });
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.94, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], highlightColor, 0.9, shellStroke, 0.06);
+      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      return;
+    }
+
+    if (entity.variant === 'note') {
+      entity.primary.forEach((shape, index) => {
+        applyPaint(
+          shape,
+          index === 1 ? accentColor : shellColor,
+          0.96,
+          shellStroke,
+          index > 2 ? 0.18 : 0.24
+        );
+      });
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.9, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], highlightColor, 0.92, shellStroke, 0.05);
+      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      return;
+    }
+
+    if (entity.variant === 'brush') {
+      entity.primary.forEach((shape, index) => {
+        applyPaint(
+          shape,
+          index === 1 ? accentColor : shellColor,
+          0.96,
+          shellStroke,
+          index === 3 ? 0.16 : 0.24
+        );
+      });
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.92, mood.sparkEdgeColor, 0.2);
+      applyPaint(entity.secondary[1], highlightColor, 0.9, shellStroke, 0.05);
+      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      return;
+    }
+
+    this.paintShapes(entity.primary, mood.sparkColor, 0.98, mood.sparkEdgeColor, 0.3);
+    this.paintShapes(entity.secondary, highlightColor, 0.96, mood.sparkEdgeColor, 0.1);
   }
 
   private paintHazard(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const sway = Math.sin(time * 0.0032 + entity.worldX * 0.01) * 0.035;
-    const primaryFill =
-      entity.variant === 'sludge'
-        ? 0x6c4325
-        : entity.variant === 'warden'
-          ? 0x2d2b3a
-          : 0x4a4031;
-    const primaryStroke =
-      entity.variant === 'sludge'
-        ? 0x9d6a42
-        : entity.variant === 'warden'
-          ? 0x7a7f93
-          : 0x887760;
-    const secondaryFill =
-      entity.variant === 'sludge'
-        ? 0xa97347
-        : entity.variant === 'warden'
-          ? 0x8e9aa4
-          : 0x9e8d74;
-    const secondaryStroke = entity.variant === 'sludge' ? 0xf8f1e5 : mood.markerColor;
-
     entity.container.setRotation(sway);
-    this.paintShapes(
-      entity.primary,
-      primaryFill,
-      entity.inactive ? 0.46 : 0.92,
-      primaryStroke,
-      0.34
-    );
-    this.paintShapes(
-      entity.secondary,
-      secondaryFill,
-      entity.inactive ? 0.34 : 0.86,
-      secondaryStroke,
-      entity.variant === 'sludge' ? 0.16 : 0.1
-    );
+
+    const primaryStroke =
+      entity.variant === 'sludge' ? 0x2c3e50 : entity.variant === 'warden' ? 0x2a1a1a : 0x1a252f;
+    const secondaryStroke = entity.variant === 'sludge' ? 0x7b8794 : mood.markerColor;
+
+    entity.primary.forEach((shape) => {
+      shape.setAlpha(entity.inactive ? 0.46 : 0.92).setStrokeStyle(3, primaryStroke, 0.6);
+    });
+    
+    entity.secondary.forEach((shape) => {
+      shape.setAlpha(entity.inactive ? 0.34 : 0.86).setStrokeStyle(2, secondaryStroke, entity.variant === 'sludge' ? 0.3 : 0.2);
+    });
   }
 
   private paintShapes(

@@ -20,23 +20,48 @@ app.innerHTML = `
     <section class="game-frame" aria-label="Mateo spark journey play area">
       <header class="hud" id="hud"></header>
       <div class="game-root" id="game-root"></div>
-      <div class="entry-shell" id="entry-shell" data-state="idle">
+      <div class="entry-shell" id="entry-shell" data-state="idle" data-stage="0">
         <button class="entry-shell__button" id="entry-button" type="button">
-          <span class="entry-shell__planet-stage" aria-hidden="true">
-            <span class="entry-shell__planet-orbit"></span>
-            <img class="entry-shell__planet" src="${planetHomeUrl}" alt="" />
-          </span>
-          <span class="entry-shell__callout">
+          
+          <div class="entry-flow__stage entry-flow__stage--0">
+            <h1 class="entry-flow__game-title">CURE RUNNER<span class="entry-flow__game-sub">WOUNDED EARTH</span></h1>
+            <span class="entry-shell__planet-stage" aria-hidden="true">
+              <span class="entry-shell__planet-orbit"></span>
+              <img class="entry-shell__planet" src="${planetHomeUrl}" alt="" />
+            </span>
+            <span class="entry-flow__cta">Toca para empezar</span>
+          </div>
+          
+          <div class="entry-flow__stage entry-flow__stage--1">
+            <div class="entry-flow__story-card">
+              <p class="entry-flow__story entry-flow__story--lead">El planeta aún respira.</p>
+              <p class="entry-flow__story">Asciende desde su interior y ayúdalo a despertar.</p>
+              <p class="entry-flow__story entry-flow__story--support">Cada paso puede devolverle luz.</p>
+            </div>
+            <span class="entry-flow__cta">Continuar</span>
+          </div>
+
+          <div class="entry-flow__stage entry-flow__stage--2">
+            <div class="entry-flow__instruction-block">
+              <p class="entry-flow__instruction">👆 Toca para saltar</p>
+            </div>
+            <div class="entry-flow__instruction-block">
+              <p class="entry-flow__instruction">👆👆 Toca en el aire<br>para doble salto</p>
+            </div>
+            <span class="entry-flow__cta">Comenzar</span>
+          </div>
+
+          <span class="entry-shell__callout" id="entry-loading">
             <span class="entry-shell__eyebrow">Level 1: Wounded Earth</span>
-            <strong class="entry-shell__title" data-role="entry-title">Entra en el planeta</strong>
-            <span class="entry-shell__mission">Tu planeta se esta rompiendo.<br />Al final de cada nivel hay un ingrediente.<br />Encuentralos para crear la cura.</span>
-            <span class="entry-shell__copy" data-role="entry-copy">Toca para empezar</span>
+            <strong class="entry-shell__title" data-role="entry-title">Abriendo el planeta</strong>
+            <span class="entry-shell__copy" data-role="entry-copy">Cargando...</span>
             <span class="entry-shell__loader" aria-hidden="true">
               <span></span>
               <span></span>
               <span></span>
             </span>
           </span>
+
         </button>
       </div>
     </section>
@@ -70,6 +95,7 @@ const entryButton = document.querySelector<HTMLButtonElement>('#entry-button');
 const entryTitle = document.querySelector<HTMLElement>('[data-role="entry-title"]');
 const entryCopy = document.querySelector<HTMLElement>('[data-role="entry-copy"]');
 let bootInFlight = false;
+let introStage = 0;
 
 const setEntryEnabled = (enabled: boolean) => {
   if (!entryButton) {
@@ -149,6 +175,12 @@ const startFromEntry = (event: PointerEvent | KeyboardEvent) => {
   }
 
   event.preventDefault();
+
+  if (introStage < 2) {
+    introStage += 1;
+    entryShell?.setAttribute('data-stage', introStage.toString());
+    return;
+  }
   void bootGame(event.type).catch((error: unknown) => {
     bootInFlight = false;
     setEntryEnabled(true);
@@ -163,7 +195,7 @@ const startFromEntry = (event: PointerEvent | KeyboardEvent) => {
     }
 
     if (entryCopy) {
-      entryCopy.textContent = 'El camino no se abrio. Toca otra vez.';
+      entryCopy.textContent = 'El camino no se abrió. Toca otra vez.';
     }
   });
 };

@@ -65,6 +65,24 @@ body::before {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+@media (hover: none) and (pointer: coarse), (max-width: 480px) {
+  .app-shell {
+    padding: 0;
+  }
+  .game-frame {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    border-radius: 0;
+    border: none;
+    aspect-ratio: auto;
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+}
+
 .entry-shell {
   position: absolute;
   inset: 0;
@@ -104,6 +122,7 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
+  position: relative;
   gap: 14px;
   padding: 18px 18px 16px;
   border: 0;
@@ -130,36 +149,7 @@ body::before {
 
 .entry-shell__planet-stage::before,
 .entry-shell__planet-stage::after {
-  content: "";
-  position: absolute;
-  inset: auto;
-  pointer-events: none;
-}
-
-.entry-shell__planet-stage::before {
-  width: 84%;
-  max-width: 314px;
-  height: 78%;
-  max-height: 314px;
-  border-radius: 56% 44% 52% 48% / 46% 54% 42% 58%;
-  border: 2px solid rgba(239, 247, 222, 0.09);
-  border-right-color: transparent;
-  border-bottom-color: rgba(112, 82, 71, 0.1);
-  transform: rotate(-9deg) translateY(8px);
-  opacity: 0.68;
-}
-
-.entry-shell__planet-stage::after {
-  width: 90%;
-  max-width: 334px;
-  height: 62%;
-  max-height: 240px;
-  background:
-    linear-gradient(108deg, transparent 0 17%, rgba(193, 255, 207, 0.12) 18% 18.8%, transparent 20% 100%),
-    linear-gradient(72deg, transparent 0 77%, rgba(110, 76, 68, 0.16) 78% 78.9%, transparent 80% 100%),
-    linear-gradient(158deg, transparent 0 46%, rgba(171, 228, 188, 0.09) 47% 47.7%, transparent 49% 100%);
-  transform: rotate(-6deg) translateY(12px);
-  opacity: 0.55;
+  content: none;
 }
 
 .entry-shell__planet-orbit {
@@ -169,20 +159,19 @@ body::before {
   aspect-ratio: 1;
   border-radius: 53% 47% 49% 51% / 45% 55% 48% 52%;
   background:
-    radial-gradient(circle, rgba(170, 255, 209, 0.16), rgba(170, 255, 209, 0.02) 56%, transparent 72%);
-  filter: blur(5px);
+    radial-gradient(circle, rgba(170, 255, 209, 0.22), rgba(170, 255, 209, 0.04) 56%, transparent 72%);
+  filter: blur(6px);
   transform: rotate(-8deg);
   animation: planet-pulse 4.8s ease-in-out infinite;
+  mix-blend-mode: screen;
 }
 
 .entry-shell__planet {
   position: relative;
-  width: min(92%, 320px);
-  aspect-ratio: 1;
-  object-fit: contain;
-  filter:
-    drop-shadow(0 10px 16px rgba(0, 0, 0, 0.22))
-    drop-shadow(0 2px 0 rgba(255, 251, 242, 0.05));
+  width: min(96%, 360px);
+  height: auto;
+  max-height: min(60vh, 420px);
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.22));
   animation: planet-drift 6.2s ease-in-out infinite;
 }
 
@@ -262,6 +251,161 @@ body::before {
 
 .entry-shell[data-state="loading"] .entry-shell__planet {
   animation-duration: 2.8s;
+}
+
+/* NEW INTRO FLOW STYLES */
+.entry-flow__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  inset: 0;
+  padding: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 300ms ease;
+  transform: translateY(10px);
+}
+
+.entry-shell[data-stage="0"] .entry-flow__stage--0,
+.entry-shell[data-stage="1"] .entry-flow__stage--1,
+.entry-shell[data-stage="2"] .entry-flow__stage--2 {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.entry-shell[data-state="loading"] .entry-flow__stage {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-10px) !important;
+}
+
+#entry-loading {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  transition: opacity 220ms ease;
+  width: calc(100% - 32px);
+  margin: 0 auto 18px auto;
+}
+
+.entry-shell[data-state="loading"] #entry-loading {
+  opacity: 1;
+}
+
+.entry-flow__game-title {
+  margin: 0;
+  margin-top: 24px;
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+.entry-flow__game-sub {
+  display: block;
+  font-size: 15px;
+  color: var(--acid);
+  letter-spacing: 0.12em;
+  opacity: 0.9;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.entry-flow__cta {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--acid);
+  padding: 14px 28px;
+  border-radius: 99px;
+  background: rgba(230, 255, 129, 0.08);
+  border: 1px solid rgba(230, 255, 129, 0.25);
+  margin-bottom: 24px;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s ease;
+}
+
+.entry-shell__button:active .entry-flow__cta {
+  background: rgba(230, 255, 129, 0.15);
+}
+
+.entry-flow__story {
+  font-size: 16px;
+  line-height: 1.45;
+  color: rgba(255, 245, 234, 0.95);
+  text-align: center;
+  max-width: none;
+  margin: 0;
+  font-weight: 600;
+}
+
+.entry-flow__story-card {
+  width: min(100%, 304px);
+  margin: auto 0;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 24px 20px 26px 18px;
+  border: 1px solid rgba(216, 244, 223, 0.12);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(230, 255, 129, 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(16, 20, 27, 0.68), rgba(10, 13, 19, 0.82));
+  box-shadow:
+    0 16px 28px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(6px);
+}
+
+.entry-flow__story-card::before {
+  content: "";
+  width: 72px;
+  height: 1px;
+  margin: 0 auto 2px;
+  background: linear-gradient(90deg, transparent, rgba(216, 244, 223, 0.34), transparent);
+}
+
+.entry-flow__story--lead {
+  font-size: 18px;
+  color: #fff7ec;
+}
+
+.entry-flow__story--support {
+  font-size: 14px;
+  color: rgba(230, 255, 129, 0.88);
+  font-weight: 700;
+}
+
+.entry-flow__instruction-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: auto 0;
+  padding: 24px 20px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.entry-flow__instruction {
+  font-size: 18px;
+  line-height: 1.4;
+  margin: 0;
+  color: rgba(255, 245, 234, 0.9);
+  font-weight: 600;
 }
 
 .hud {
@@ -383,11 +527,19 @@ body::before {
   text-transform: none;
 }
 
-.game-root,
+.game-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .game-root canvas {
-  width: 100%;
-  height: 100%;
   display: block;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 @keyframes entry-bounce {

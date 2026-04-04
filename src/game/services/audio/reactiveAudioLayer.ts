@@ -45,7 +45,7 @@ class ReactiveAudioLayer {
     const context = new ContextCtor();
     const master = context.createGain();
 
-    master.gain.value = 0.075;
+    master.gain.value = 0.11;
     master.connect(context.destination);
 
     this.context = context;
@@ -180,6 +180,41 @@ class ReactiveAudioLayer {
         volume: 0.024,
         type: 'sine'
       });
+      return;
+    }
+
+    if (event.type === 'jump_player') {
+      const jumpIntensity = Math.max(0.92, Math.min(1.3, event.intensity || 1));
+
+      this.playTone(context, master, {
+        from: 240,
+        to: 180,
+        duration: 0.024,
+        volume: 0.0066 * jumpIntensity,
+        type: 'triangle',
+        attack: 0.003,
+        filterFrequency: 420
+      });
+      this.playTone(context, master, {
+        from: 300,
+        to: 560,
+        duration: 0.082,
+        delay: 0.004,
+        volume: 0.024 * jumpIntensity,
+        type: 'triangle',
+        attack: 0.006,
+        filterFrequency: 1200
+      });
+      this.playTone(context, master, {
+        from: 460,
+        to: 620,
+        duration: 0.042,
+        delay: 0.014,
+        volume: 0.009 * jumpIntensity,
+        type: 'sine',
+        attack: 0.004
+      });
+      return;
     }
   }
 
@@ -194,13 +229,14 @@ class ReactiveAudioLayer {
       type: OscillatorKind;
       delay?: number;
       filterFrequency?: number;
+      attack?: number;
     }
   ) {
     const oscillator = context.createOscillator();
     const envelope = context.createGain();
     const filter = options.filterFrequency ? context.createBiquadFilter() : null;
     const startTime = context.currentTime + (options.delay ?? 0);
-    const attack = 0.012;
+    const attack = options.attack ?? 0.012;
     const releaseTime = startTime + options.duration;
     const stopTime = releaseTime + 0.05;
 

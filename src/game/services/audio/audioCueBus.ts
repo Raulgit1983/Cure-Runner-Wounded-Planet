@@ -3,7 +3,8 @@ export type AudioCueType =
   | 'chain_success'
   | 'pulse_drop'
   | 'awakening_gain'
-  | 'victory_win';
+  | 'victory_win'
+  | 'jump_player';
 
 export interface AudioCueEvent {
   type: AudioCueType;

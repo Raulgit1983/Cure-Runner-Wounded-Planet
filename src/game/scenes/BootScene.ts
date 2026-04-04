@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import { importWithRecovery } from '@/app/importWithRecovery';
-import sharkTextureUrl from '@/assets/creatures/shark-friend.webp';
+import sharkTextureUrl from '@/assets/creatures/tiburoncin-ok.png';
 import heroTextureUrl from '@/assets/hero/hero-main.webp';
 import { heroProfile } from '@/game/content/heroProfile';
 
@@ -34,8 +34,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    this.statusText?.setText('Entrando al Nivel 1...');
-    this.hintText?.setText('Busca el primer ingrediente.');
+    this.statusText?.setText('Ascendiendo...');
+    this.hintText?.setText('La oscuridad queda atrás.');
     this.renderProgress(0.82);
     this.time.delayedCall(16, () => {
       void this.startJourney();
@@ -71,7 +71,7 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hintText = this.add
-      .text(centerX, centerY + 52, 'Tu planeta se esta rompiendo. Busca la cura.', {
+      .text(centerX, centerY + 52, 'El viaje comienza en el núcleo.', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '11px',
         color: '#d5d8df'
