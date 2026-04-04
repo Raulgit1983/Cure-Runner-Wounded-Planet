@@ -6,6 +6,7 @@ import {
   runnerPhraseRotation,
   type CollectibleVariant,
   type HazardVariant,
+  type PhraseFamily,
   type RunnerPhrase,
   type RunnerPhraseItem
 } from '@/game/content/runnerPhrases';
@@ -19,8 +20,21 @@ type PaintableShape =
   | Phaser.GameObjects.Ellipse
   | Phaser.GameObjects.Triangle;
 
+type LaneEntityRole = 'collectible' | 'hazard';
+
+interface EntityDefinition {
+  label: string;
+  role: LaneEntityRole;
+  depth: number;
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 interface RunnerEntity {
-  kind: RunnerPhraseItem['kind'];
+  label: string;
+  role: LaneEntityRole;
   variant: CollectibleVariant | HazardVariant;
   worldX: number;
   baseY: number;
@@ -28,11 +42,27 @@ interface RunnerEntity {
   screenY: number;
   width: number;
   height: number;
+  hitboxOffsetX: number;
+  hitboxOffsetY: number;
   container: Phaser.GameObjects.Container;
   halo?: Phaser.GameObjects.Ellipse;
   primary: PaintableShape[];
   secondary: PaintableShape[];
   inactive: boolean;
+}
+
+export interface RunnerDebugEntitySnapshot {
+  label: string;
+  role: LaneEntityRole;
+  screenX: number;
+  screenY: number;
+  active: boolean;
+  hitbox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface RunnerLoopSnapshot {
@@ -54,23 +84,29 @@ export interface RunnerLoopSnapshot {
   coyoteSeconds: number;
   currentPhraseId: string;
   currentPhraseLabel: string;
+  currentPhraseFamily: PhraseFamily;
   projectedLandingX: number | null;
+  runFailed: boolean;
 }
 
-const collectibleMetrics = {
-  spark: { width: 18, height: 18 },
-  note: { width: 22, height: 30 },
-  brush: { width: 28, height: 18 }
+const collectibleDefinitions: Record<CollectibleVariant, EntityDefinition> = {
+  spark: { label: 'spark', role: 'collectible', depth: 4, width: 18, height: 18, offsetX: 0, offsetY: 0 },
+  note: { label: 'note', role: 'collectible', depth: 4, width: 22, height: 30, offsetX: 0, offsetY: 0 },
+  brush: { label: 'brush', role: 'collectible', depth: 4, width: 28, height: 18, offsetX: 0, offsetY: 0 }
 } as const;
 
-const hazardMetrics = {
-  sludge: { width: 24, height: 16 },
-  warden: { width: 20, height: 32 },
-  hound: { width: 28, height: 16 }
+const hazardDefinitions: Record<HazardVariant, EntityDefinition> = {
+  sludge: { label: 'sludge', role: 'hazard', depth: 3.6, width: 34, height: 20, offsetX: -4, offsetY: -10 },
+  warden: { label: 'warden', role: 'hazard', depth: 3.6, width: 30, height: 38, offsetX: 0, offsetY: -11 },
+  hound: { label: 'hound', role: 'hazard', depth: 3.6, width: 36, height: 20, offsetX: 3, offsetY: -12 }
 } as const;
+
+const collectRadiusSquared = runnerConfig.rewards.collectRadius * runnerConfig.rewards.collectRadius;
 
 export class RunnerLoopSystem {
   private readonly entities: RunnerEntity[] = [];
+  private readonly heroBoundsRect = new Phaser.Geom.Rectangle();
+  private readonly entityBoundsRect = new Phaser.Geom.Rectangle();
 
   private heroY = runnerConfig.hero.runY;
   private heroVelocityY = 0;
@@ -96,8 +132,13 @@ export class RunnerLoopSystem {
   private currentSpeed: number = runnerConfig.movement.baseSpeed;
   private currentPhraseId: string = runnerPhrases.onboarding_arc.id;
   private currentPhraseLabel: string = runnerPhrases.onboarding_arc.label;
+  private currentPhraseFamily: PhraseFamily = runnerPhrases.onboarding_arc.family;
+  private failed = false;
 
-  constructor(private readonly scene: Phaser.Scene) {
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly showDebug = false
+  ) {
     this.bindInput();
   }
 
@@ -161,8 +202,30 @@ export class RunnerLoopSystem {
       coyoteSeconds: this.coyoteSeconds,
       currentPhraseId: this.currentPhraseId,
       currentPhraseLabel: this.currentPhraseLabel,
-      projectedLandingX: this.projectLandingScreenX()
+      currentPhraseFamily: this.currentPhraseFamily,
+      projectedLandingX: this.showDebug ? this.projectLandingScreenX() : null,
+      runFailed: this.failed
     };
+  }
+
+  debugSnapshot(): RunnerDebugEntitySnapshot[] {
+    return this.entities.map((entity) => {
+      const hitbox = this.getEntityBounds(entity);
+
+      return {
+        label: entity.label,
+        role: entity.role,
+        screenX: entity.screenX,
+        screenY: entity.screenY,
+        active: !entity.inactive,
+        hitbox: {
+          x: hitbox.x,
+          y: hitbox.y,
+          width: hitbox.width,
+          height: hitbox.height
+        }
+      };
+    });
   }
 
   destroy() {
@@ -298,6 +361,7 @@ export class RunnerLoopSystem {
   private spawnPhrase(phrase: RunnerPhrase, mood: MoodSnapshot) {
     this.currentPhraseId = phrase.id;
     this.currentPhraseLabel = phrase.label;
+    this.currentPhraseFamily = phrase.family;
 
     phrase.items.forEach((item) => {
       this.entities.push(this.createEntity(this.nextPhraseWorldX + item.x, item, mood));
@@ -337,7 +401,8 @@ export class RunnerLoopSystem {
     centerHeight: number,
     mood: MoodSnapshot
   ): RunnerEntity {
-    const container = this.scene.add.container(0, 0).setDepth(4);
+    const definition = collectibleDefinitions[variant];
+    const container = this.scene.add.container(0, 0).setDepth(definition.depth);
     const halo = this.scene.add
       .ellipse(0, 0, 42, 42, mood.sparkColor, mood.sparkHaloAlpha)
       .setBlendMode(Phaser.BlendModes.ADD);
@@ -376,14 +441,17 @@ export class RunnerLoopSystem {
     container.add([halo, ...primary, ...secondary]);
 
     return {
-      kind: 'collectible',
+      label: definition.label,
+      role: definition.role,
       variant,
       worldX,
       baseY: runnerConfig.visual.groundLineY - centerHeight,
       screenX: 0,
       screenY: 0,
-      width: collectibleMetrics[variant].width,
-      height: collectibleMetrics[variant].height,
+      width: definition.width,
+      height: definition.height,
+      hitboxOffsetX: definition.offsetX,
+      hitboxOffsetY: definition.offsetY,
       container,
       halo,
       primary,
@@ -398,20 +466,24 @@ export class RunnerLoopSystem {
     centerHeight: number,
     mood: MoodSnapshot
   ): RunnerEntity {
-    const container = this.scene.add.container(0, 0).setDepth(3.6);
+    const definition = hazardDefinitions[variant];
+    const container = this.scene.add.container(0, 0).setDepth(definition.depth);
     const primary: PaintableShape[] = [];
     const secondary: PaintableShape[] = [];
 
     if (variant === 'sludge') {
       primary.push(
+        this.scene.add.ellipse(-4, 14, 42, 8, 0x24150b, 0.34),
         this.scene.add.ellipse(-4, 10, 34, 14, 0x5f3a1f, 0.96),
         this.scene.add.ellipse(-3, 0, 26, 14, 0x6d4324, 0.96),
         this.scene.add.ellipse(2, -10, 18, 12, 0x784929, 0.96),
         this.scene.add.triangle(8, -19, -6, 3, 0, -8, 7, 4, 0x7f502d, 0.96)
       );
       secondary.push(
+        this.scene.add.ellipse(-2, 14, 24, 4, 0x120b07, 0.32),
         this.scene.add.ellipse(-7, -12, 7, 4, 0xa56e43, 0.9),
         this.scene.add.ellipse(3, -7, 6, 4, 0xa56e43, 0.86),
+        this.scene.add.ellipse(8, -13, 4, 3, 0xf6d9ba, 0.32),
         this.scene.add.ellipse(12, -1, 5, 3, 0x3a2413, 0.34),
         this.scene.add.ellipse(-15, 12, 8, 4, 0xf8f1e5, 0.12)
       );
@@ -419,15 +491,18 @@ export class RunnerLoopSystem {
 
     if (variant === 'warden') {
       primary.push(
+        this.scene.add.ellipse(0, 20, 34, 8, 0x13111a, 0.32),
         this.scene.add.rectangle(0, 6, 24, 30, mood.shadowColor, 0.94),
         this.scene.add.rectangle(0, -3, 28, 8, mood.shadowColor, 0.94),
         this.scene.add.ellipse(0, -18, 18, 17, mood.shadowColor, 0.94),
+        this.scene.add.triangle(0, -10, -14, 3, 0, -14, 14, 3, mood.shadowColor, 0.94),
         this.scene.add.rectangle(-9, -2, 7, 18, mood.shadowColor, 0.94),
         this.scene.add.rectangle(9, -2, 7, 18, mood.shadowColor, 0.94)
       );
       secondary.push(
         this.scene.add.rectangle(0, -29, 28, 6, mood.floorLineColor, 0.88),
         this.scene.add.ellipse(0, -18, 6, 6, mood.markerColor, 0.88),
+        this.scene.add.rectangle(0, -9, 3, 10, mood.markerColor, 0.76),
         this.scene.add.rectangle(0, -4, 16, 4, mood.markerColor, 0.24),
         this.scene.add.rectangle(-7, 22, 6, 10, mood.floorLineColor, 0.9),
         this.scene.add.rectangle(7, 22, 6, 10, mood.floorLineColor, 0.9),
@@ -437,17 +512,20 @@ export class RunnerLoopSystem {
 
     if (variant === 'hound') {
       primary.push(
+        this.scene.add.ellipse(-2, 18, 34, 8, 0x13100b, 0.28),
         this.scene.add.ellipse(-4, 8, 30, 16, mood.shadowColor, 0.94),
         this.scene.add.ellipse(12, -1, 18, 14, mood.shadowColor, 0.94),
         this.scene.add.ellipse(21, 2, 10, 8, mood.shadowColor, 0.94),
         this.scene.add.ellipse(3, 1, 10, 8, mood.shadowColor, 0.94)
       );
       secondary.push(
+        this.scene.add.rectangle(-4, -3, 18, 2, mood.markerColor, 0.38).setRotation(-0.06),
         this.scene.add.triangle(7, -12, -3, 0, 3, -10, 8, 4, mood.floorLineColor, 0.92),
         this.scene.add.triangle(17, -12, -3, 0, 3, -10, 8, 4, mood.floorLineColor, 0.92),
         this.scene.add.triangle(-20, 2, -10, 0, -20, -8, -18, 9, mood.floorLineColor, 0.86),
         this.scene.add.rectangle(-14, 17, 6, 8, mood.floorLineColor, 0.9),
         this.scene.add.rectangle(0, 18, 6, 8, mood.floorLineColor, 0.9),
+        this.scene.add.rectangle(14, 15, 10, 2, mood.floorLineColor, 0.6).setRotation(0.24),
         this.scene.add.ellipse(20, 1, 4, 4, mood.markerColor, 0.78),
         this.scene.add.rectangle(14, 7, 7, 2, mood.markerColor, 0.42).setRotation(0.1)
       );
@@ -456,14 +534,17 @@ export class RunnerLoopSystem {
     container.add([...primary, ...secondary]);
 
     return {
-      kind: 'hazard',
+      label: definition.label,
+      role: definition.role,
       variant,
       worldX,
       baseY: runnerConfig.visual.groundLineY - centerHeight,
       screenX: 0,
       screenY: 0,
-      width: hazardMetrics[variant].width,
-      height: hazardMetrics[variant].height,
+      width: definition.width,
+      height: definition.height,
+      hitboxOffsetX: definition.offsetX,
+      hitboxOffsetY: definition.offsetY,
       container,
       primary,
       secondary,
@@ -474,48 +555,45 @@ export class RunnerLoopSystem {
   private updateEntities(time: number, mood: MoodSnapshot) {
     const heroBounds = this.getHeroBounds();
     const heroCenterY = this.heroY - 26;
-    const expired = new Set<RunnerEntity>();
+    const missThreshold = runnerConfig.hero.screenX - runnerConfig.rewards.missMargin;
 
-    this.entities.forEach((entity) => {
+    for (let index = this.entities.length - 1; index >= 0; index -= 1) {
+      const entity = this.entities[index]!;
       const screenX = runnerConfig.hero.screenX + (entity.worldX - this.distanceTravelled);
       const wobble =
-        entity.kind === 'collectible'
+        entity.role === 'collectible'
           ? Math.sin(time * 0.0052 + entity.worldX * 0.02) * 4.4
           : Math.sin(time * 0.0037 + entity.worldX * 0.01) * 1.4;
+      let shouldRemove = false;
 
       entity.screenX = screenX;
       entity.screenY = entity.baseY + wobble;
       entity.container.setPosition(entity.screenX, entity.screenY);
 
-      if (entity.kind === 'collectible') {
+      if (entity.role === 'collectible') {
         this.paintCollectible(entity, mood, time);
 
         if (!entity.inactive) {
-          const distance = Phaser.Math.Distance.Between(
-            runnerConfig.hero.screenX + 4,
-            heroCenterY,
-            entity.screenX,
-            entity.screenY
-          );
+          const deltaX = runnerConfig.hero.screenX + 4 - entity.screenX;
+          const deltaY = heroCenterY - entity.screenY;
+          const distanceSquared = deltaX * deltaX + deltaY * deltaY;
 
-          if (distance <= runnerConfig.rewards.collectRadius) {
+          if (distanceSquared <= collectRadiusSquared) {
             this.collectEntity(entity);
-            expired.add(entity);
-            return;
-          }
+            shouldRemove = true;
+          } else if (entity.screenX < missThreshold) {
+            const snapshot = sessionState.snapshot();
 
-          if (entity.screenX < runnerConfig.hero.screenX - runnerConfig.rewards.missMargin) {
-            if (sessionState.snapshot().currentChain > 0) {
+            if (snapshot.currentChain > 0) {
               sessionState.breakChain();
               this.chainBurst = Math.max(0, this.chainBurst - 0.18);
             }
 
             entity.inactive = true;
-            expired.add(entity);
-            return;
+            shouldRemove = true;
           }
         }
-      } else {
+      } else if (entity.role === 'hazard') {
         this.paintHazard(entity, mood, time);
 
         if (!entity.inactive && this.invulnerabilitySeconds <= 0 && this.overlapsHero(entity, heroBounds)) {
@@ -526,18 +604,10 @@ export class RunnerLoopSystem {
       }
 
       if (entity.screenX < -runnerConfig.spawn.removalMargin) {
-        expired.add(entity);
+        shouldRemove = true;
       }
-    });
 
-    if (expired.size > 0) {
-      for (let index = this.entities.length - 1; index >= 0; index -= 1) {
-        const entity = this.entities[index]!;
-
-        if (!expired.has(entity)) {
-          continue;
-        }
-
+      if (shouldRemove) {
         entity.container.destroy(true);
         this.entities.splice(index, 1);
       }
@@ -590,6 +660,10 @@ export class RunnerLoopSystem {
   }
 
   private hitHazard(entity: RunnerEntity) {
+    if (this.failed) {
+      return;
+    }
+
     const previous = sessionState.snapshot();
 
     sessionState.registerPulseDrop({
@@ -602,7 +676,7 @@ export class RunnerLoopSystem {
     this.chainBurst = Math.max(0, this.chainBurst - 0.28);
     this.staggerSeconds = runnerConfig.obstacle.staggerSeconds;
     this.invulnerabilitySeconds = runnerConfig.obstacle.invulnerabilitySeconds;
-    this.recoveryQueued = true;
+    this.failed = true;
     runTelemetryStore.noteObstacleHit();
 
     audioCueBus.emit({
@@ -616,25 +690,31 @@ export class RunnerLoopSystem {
       sessionState.breakChain();
     }
 
+    this.setFrozen(true);
     entity.container.setRotation(Phaser.Math.DegToRad(6));
   }
 
   private getHeroBounds() {
-    return new Phaser.Geom.Rectangle(
-      runnerConfig.hero.screenX - runnerConfig.hero.hitbox.width / 2,
-      this.heroY - runnerConfig.hero.hitbox.topOffset,
-      runnerConfig.hero.hitbox.width,
-      runnerConfig.hero.hitbox.topOffset + runnerConfig.hero.hitbox.bottomOffset
-    );
+    this.heroBoundsRect.x = runnerConfig.hero.screenX - runnerConfig.hero.hitbox.width / 2;
+    this.heroBoundsRect.y = this.heroY - runnerConfig.hero.hitbox.topOffset;
+    this.heroBoundsRect.width = runnerConfig.hero.hitbox.width;
+    this.heroBoundsRect.height =
+      runnerConfig.hero.hitbox.topOffset + runnerConfig.hero.hitbox.bottomOffset;
+
+    return this.heroBoundsRect;
+  }
+
+  private getEntityBounds(entity: RunnerEntity) {
+    this.entityBoundsRect.x = entity.screenX + entity.hitboxOffsetX - entity.width / 2;
+    this.entityBoundsRect.y = entity.screenY + entity.hitboxOffsetY - entity.height / 2;
+    this.entityBoundsRect.width = entity.width;
+    this.entityBoundsRect.height = entity.height;
+
+    return this.entityBoundsRect;
   }
 
   private overlapsHero(entity: RunnerEntity, heroBounds: Phaser.Geom.Rectangle) {
-    const entityBounds = new Phaser.Geom.Rectangle(
-      entity.screenX - entity.width / 2,
-      entity.screenY - entity.height / 2,
-      entity.width,
-      entity.height
-    );
+    const entityBounds = this.getEntityBounds(entity);
 
     return Phaser.Geom.Intersects.RectangleToRectangle(heroBounds, entityBounds);
   }

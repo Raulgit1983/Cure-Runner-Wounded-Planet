@@ -28,9 +28,9 @@ app.innerHTML = `
           </span>
           <span class="entry-shell__callout">
             <span class="entry-shell__eyebrow">Level 1: Wounded Earth</span>
-            <strong class="entry-shell__title" data-role="entry-title">Enter the planet</strong>
-            <span class="entry-shell__mission">Find the first ingredient for the cure.</span>
-            <span class="entry-shell__copy" data-role="entry-copy">Tap to begin</span>
+            <strong class="entry-shell__title" data-role="entry-title">Entra en el planeta</strong>
+            <span class="entry-shell__mission">Tu planeta se esta rompiendo.<br />Al final de cada nivel hay un ingrediente.<br />Encuentralos para crear la cura.</span>
+            <span class="entry-shell__copy" data-role="entry-copy">Toca para empezar</span>
             <span class="entry-shell__loader" aria-hidden="true">
               <span></span>
               <span></span>
@@ -55,6 +55,14 @@ const showDebug =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('debug') === '1';
 
+const logStartDebug = (message: string, details?: Record<string, unknown>) => {
+  if (!showDebug) {
+    return;
+  }
+
+  console.info('[entry-start]', message, details ?? {});
+};
+
 const hud = createHud(hudRoot);
 const audioLayer = createReactiveAudioLayer();
 const entryShell = document.querySelector<HTMLElement>('#entry-shell');
@@ -63,21 +71,41 @@ const entryTitle = document.querySelector<HTMLElement>('[data-role="entry-title"
 const entryCopy = document.querySelector<HTMLElement>('[data-role="entry-copy"]');
 let bootInFlight = false;
 
-const bootGame = async () => {
-  if (bootInFlight) {
+const setEntryEnabled = (enabled: boolean) => {
+  if (!entryButton) {
     return;
   }
 
+  entryButton.disabled = !enabled;
+  entryButton.setAttribute('aria-busy', enabled ? 'false' : 'true');
+};
+
+const bootGame = async (trigger: string) => {
+  if (bootInFlight) {
+    logStartDebug('ignored: guard active', {
+      trigger,
+      disabled: entryButton?.disabled ?? null,
+      state: entryShell?.getAttribute('data-state') ?? null,
+    });
+    return false;
+  }
+
   bootInFlight = true;
+  logStartDebug('accepted', {
+    trigger,
+    disabled: entryButton?.disabled ?? null,
+    state: entryShell?.getAttribute('data-state') ?? null,
+  });
+  setEntryEnabled(false);
   audioCueBus.unlockFromGesture();
   entryShell?.setAttribute('data-state', 'loading');
 
   if (entryTitle) {
-    entryTitle.textContent = 'Opening the planet...';
+    entryTitle.textContent = 'Abriendo el planeta...';
   }
 
   if (entryCopy) {
-    entryCopy.textContent = 'Loading Level 1.';
+    entryCopy.textContent = 'Cargando el Nivel 1.';
   }
 
   await new Promise<void>((resolve) => {
@@ -90,24 +118,62 @@ const bootGame = async () => {
   window.setTimeout(() => {
     entryShell?.remove();
   }, 220);
+  return true;
 };
 
-const startFromEntry = () => {
-  void bootGame().catch(() => {
+const startFromEntry = (event: PointerEvent | KeyboardEvent) => {
+  logStartDebug('event', {
+    type: event.type,
+    target: event.target instanceof HTMLElement ? event.target.id || event.target.className || event.target.tagName : null,
+    disabled: entryButton?.disabled ?? null,
+    guardActive: bootInFlight,
+  });
+
+  if (event instanceof PointerEvent) {
+    if (event.button !== 0 || event.isPrimary === false) {
+      logStartDebug('ignored: non-primary pointer', {
+        type: event.type,
+        button: event.button,
+        isPrimary: event.isPrimary,
+      });
+      return;
+    }
+  }
+
+  if (entryButton?.disabled) {
+    logStartDebug('ignored: button disabled', {
+      type: event.type,
+      state: entryShell?.getAttribute('data-state') ?? null,
+    });
+    return;
+  }
+
+  event.preventDefault();
+  void bootGame(event.type).catch((error: unknown) => {
     bootInFlight = false;
+    setEntryEnabled(true);
     entryShell?.setAttribute('data-state', 'idle');
+    logStartDebug('failed: start reset', {
+      type: event.type,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
 
     if (entryTitle) {
-      entryTitle.textContent = 'Enter the planet';
+      entryTitle.textContent = 'Entra en el planeta';
     }
 
     if (entryCopy) {
-      entryCopy.textContent = 'The path did not open. Tap again.';
+      entryCopy.textContent = 'El camino no se abrio. Toca otra vez.';
     }
   });
 };
 
-entryButton?.addEventListener('pointerdown', startFromEntry, { passive: true });
+entryShell?.addEventListener('pointerdown', startFromEntry);
+entryButton?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    startFromEntry(event);
+  }
+});
 
 if (showDebug) {
   (window as Window & { __MATEO_RUN_TELEMETRY__?: typeof runTelemetryStore }).__MATEO_RUN_TELEMETRY__ =

@@ -34,8 +34,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    this.statusText?.setText('Entering Level 1...');
-    this.hintText?.setText('Hold on while the planet opens.');
+    this.statusText?.setText('Entrando al Nivel 1...');
+    this.hintText?.setText('Busca el primer ingrediente.');
     this.renderProgress(0.82);
     this.time.delayedCall(16, () => {
       void this.startJourney();
@@ -63,7 +63,7 @@ export class BootScene extends Phaser.Scene {
     brace.lineBetween(centerX, centerY - 76, centerX, centerY - 32);
 
     this.statusText = this.add
-      .text(centerX, centerY + 24, 'Opening the wounded earth...', {
+      .text(centerX, centerY + 24, 'Abriendo la tierra herida...', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '18px',
         color: '#fff5ea'
@@ -71,7 +71,7 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hintText = this.add
-      .text(centerX, centerY + 52, 'Searching for the first ingredient.', {
+      .text(centerX, centerY + 52, 'Tu planeta se esta rompiendo. Busca la cura.', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '11px',
         color: '#d5d8df'
@@ -106,8 +106,8 @@ export class BootScene extends Phaser.Scene {
       this.scene.add('journey', JourneyScene, false);
       this.scene.start('journey');
     } catch {
-      this.statusText?.setText('Tap to reload');
-      this.hintText?.setText('The run changed after an update. Tap to try again.');
+      this.statusText?.setText('Toca para recargar');
+      this.hintText?.setText('La ruta cambio tras una actualizacion. Toca para volver.');
       this.renderProgress(0.18);
       this.input.once('pointerdown', () => {
         window.location.reload();

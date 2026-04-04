@@ -58,7 +58,6 @@ export const runnerConfig = {
     recoveryPulseThreshold: 0.17
   },
   visual: {
-    groundLineY: 548,
-    backdropTravelStep: 12
+    groundLineY: 548
   }
 } as const;

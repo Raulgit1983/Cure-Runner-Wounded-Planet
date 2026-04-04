@@ -10,10 +10,21 @@ import { EmotionController } from '@/game/systems/emotion/EmotionController';
 import { RunnerLoopSystem, type RunnerLoopSnapshot } from '@/game/systems/runner/RunnerLoopSystem';
 
 const SHARK_TEXTURE_KEY = 'shark-friend';
+const DEBUG_DECORATIVE_FAMILIES = ['backdrop', 'ground-markers', 'shark-friend'] as const;
 const FINISH_TITLE = 'Ingrediente 1 encontrado';
 const FINISH_LABEL = 'Nota sol';
 const FINISH_BODY = 'El planeta todavía puede sanar.';
 const FINISH_CLOSING = 'Sigamos construyendo un mundo nuevo juntos.';
+const FAIL_TITLE = 'Respira.';
+const FAIL_BODY = 'El camino sigue ahi.';
+const FAIL_CLOSING = 'Toca para intentarlo otra vez.';
+const SUPPORTIVE_LINES = [
+  'Sigue.',
+  'Otro paso y el planeta respira.',
+  'La luz ya empieza a abrirse.',
+  'No vas solo.'
+] as const;
+const SHARK_LINES = ['Sigue.', 'Mas aire delante.', 'No vas solo.'] as const;
 
 export class JourneyScene extends Phaser.Scene {
   private readonly showDebug =
@@ -37,7 +48,11 @@ export class JourneyScene extends Phaser.Scene {
   private heroAura!: Phaser.GameObjects.Ellipse;
   private hero!: Phaser.GameObjects.Image;
   private ingredient!: Phaser.GameObjects.Container;
+  private finishStage!: Phaser.GameObjects.Container;
+  private finishReward!: Phaser.GameObjects.Container;
   private finishMessage!: Phaser.GameObjects.Container;
+  private failStage!: Phaser.GameObjects.Container;
+  private retryOverlay!: Phaser.GameObjects.Rectangle;
   private runnerLoop!: RunnerLoopSystem;
   private shark!: Phaser.GameObjects.Container;
   private sharkShadow!: Phaser.GameObjects.Ellipse;
@@ -46,14 +61,21 @@ export class JourneyScene extends Phaser.Scene {
   private baseHeroScale = 1;
   private heroRenderScaleX = 1;
   private heroRenderScaleY = 1;
-  private lastBackdropStep = -1;
-  private lastBackdropTravelStep = -1;
-  private lastSurfaceStep = -1;
+  private backdropDistance = 0;
+  private backdropSurfaceProgress = 0;
+  private backdropFinishRevealProgress = 0;
+  private backdropEnvironmentLevel = 0;
+  private lastBackdropRenderDistance = Number.NaN;
+  private lastBackdropRenderSurface = Number.NaN;
+  private lastBackdropRenderFinish = Number.NaN;
+  private lastBackdropRenderLevel = Number.NaN;
   private lastDebugEmit = 0;
   private finishPulse = 0;
   private finishResolved = false;
   private finishSequence = 0;
+  private failResolved = false;
   private victoryFrozen = false;
+  private restartQueued = false;
   private sharkBurst = 0;
   private sharkCooldown = 3.8;
   private sharkDuration = 1.9;
@@ -61,6 +83,11 @@ export class JourneyScene extends Phaser.Scene {
   private sharkBaseY = 210;
   private sharkActive = false;
   private sharkTagged = false;
+  private lastGuidanceAt = -9999;
+  private guidanceIndex = 0;
+  private sharkGuidanceIndex = 0;
+  private lastSeenPhraseId = '';
+  private surfaceGuidanceShown = false;
   private offAudioCue?: () => void;
 
   constructor() {
@@ -72,18 +99,32 @@ export class JourneyScene extends Phaser.Scene {
     const heroX = runnerConfig.hero.screenX;
     const width = journeyConfig.logicalSize.width;
 
-    this.lastBackdropStep = -1;
-    this.lastBackdropTravelStep = -1;
-    this.lastSurfaceStep = -1;
+    this.backdropDistance = 0;
+    this.backdropSurfaceProgress = 0;
+    this.backdropFinishRevealProgress = 0;
+    this.backdropEnvironmentLevel = sessionState.snapshot().displayLevel;
+    this.lastBackdropRenderDistance = Number.NaN;
+    this.lastBackdropRenderSurface = Number.NaN;
+    this.lastBackdropRenderFinish = Number.NaN;
+    this.lastBackdropRenderLevel = Number.NaN;
     this.finishPulse = 0;
     this.finishResolved = false;
     this.finishSequence = 0;
+    this.failResolved = false;
     this.victoryFrozen = false;
+    this.restartQueued = false;
     this.sharkBurst = 0;
     this.sharkCooldown = 3.8;
     this.sharkActive = false;
     this.sharkTagged = false;
+    this.lastGuidanceAt = -9999;
+    this.guidanceIndex = 0;
+    this.sharkGuidanceIndex = 0;
+    this.lastSeenPhraseId = '';
+    this.surfaceGuidanceShown = false;
 
+    this.emitVictoryState(false);
+    this.emitFocusMode(false);
     this.backdrop = this.add.graphics().setDepth(0);
     this.finishScrim = this.add
       .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x0a0d12, 0)
@@ -109,7 +150,19 @@ export class JourneyScene extends Phaser.Scene {
     this.heroRenderScaleY = this.baseHeroScale;
     this.hero.setScale(this.baseHeroScale);
     this.ingredient = this.createIngredient(width - 52, 188);
-    this.finishMessage = this.createFinishMessage(width * 0.5, 448);
+    this.finishReward = this.createIngredient(0, -108).setAlpha(1).setScale(1.06);
+    this.finishMessage = this.createFinishMessage(0, 42);
+    this.finishStage = this.add
+      .container(width * 0.5, 432, [this.finishReward, this.finishMessage])
+      .setDepth(6.65)
+      .setAlpha(0)
+      .setScale(0.9);
+    this.failStage = this.createFailStage(width * 0.5, 388);
+    this.retryOverlay = this.add
+      .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x000000, 0.001)
+      .setDepth(6.76)
+      .setAlpha(0)
+      .setVisible(false);
     this.sharkShadow = this.add
       .ellipse(-120, runnerConfig.visual.groundLineY - 44, 58, 12, 0x09080d, 0.1)
       .setDepth(4.45)
@@ -118,7 +171,7 @@ export class JourneyScene extends Phaser.Scene {
     this.debugGraphics = this.showDebug ? this.add.graphics().setDepth(6.8) : undefined;
 
     runTelemetryStore.beginRun();
-    this.runnerLoop = new RunnerLoopSystem(this);
+    this.runnerLoop = new RunnerLoopSystem(this, this.showDebug);
     this.bindAudioFeedback();
     this.renderBackdrop(this.emotionController.getMood(sessionState.snapshot().displayLevel), 0, 0, 0);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
@@ -135,6 +188,10 @@ export class JourneyScene extends Phaser.Scene {
 
     this.runnerLoop.update(deltaSeconds, time, mood, snapshot.displayLevel);
     const loopSnapshot = this.runnerLoop.snapshot();
+
+    if (loopSnapshot.runFailed && !this.failResolved && !this.finishResolved) {
+      this.beginFailureBeat();
+    }
 
     if (this.finishResolved) {
       this.finishSequence = Math.min(1, this.finishSequence + deltaSeconds * 2.6);
@@ -163,32 +220,52 @@ export class JourneyScene extends Phaser.Scene {
       1
     );
     const renderMood = this.emotionController.getMood(environmentLevel);
-    const backdropStep = Math.round(environmentLevel * journeyConfig.backdropRedrawSteps);
-    const backdropTravelStep = Math.round(
-      loopSnapshot.distanceTravelled / runnerConfig.visual.backdropTravelStep
+    const backdropFollow =
+      1 - Math.exp(-deltaSeconds * journeyConfig.backdrop.followSharpness);
+
+    this.backdropDistance = Phaser.Math.Linear(
+      this.backdropDistance,
+      loopSnapshot.distanceTravelled,
+      backdropFollow
     );
-    const surfaceStep = Math.round(
-      loopSnapshot.surfaceProgress * 24 + loopSnapshot.finishRevealProgress * 14
+    this.backdropSurfaceProgress = Phaser.Math.Linear(
+      this.backdropSurfaceProgress,
+      loopSnapshot.surfaceProgress,
+      backdropFollow
+    );
+    this.backdropFinishRevealProgress = Phaser.Math.Linear(
+      this.backdropFinishRevealProgress,
+      loopSnapshot.finishRevealProgress,
+      backdropFollow
+    );
+    this.backdropEnvironmentLevel = Phaser.Math.Linear(
+      this.backdropEnvironmentLevel,
+      environmentLevel,
+      backdropFollow
     );
 
-    if (
-      backdropStep !== this.lastBackdropStep ||
-      backdropTravelStep !== this.lastBackdropTravelStep ||
-      surfaceStep !== this.lastSurfaceStep
-    ) {
+    if (this.shouldRenderBackdrop()) {
+      const renderMood = this.emotionController.getMood(this.backdropEnvironmentLevel);
+
       this.renderBackdrop(
         renderMood,
-        loopSnapshot.distanceTravelled,
-        loopSnapshot.surfaceProgress,
-        loopSnapshot.finishRevealProgress
+        this.backdropDistance,
+        this.backdropSurfaceProgress,
+        this.backdropFinishRevealProgress
       );
-      this.lastBackdropStep = backdropStep;
-      this.lastBackdropTravelStep = backdropTravelStep;
-      this.lastSurfaceStep = surfaceStep;
+      this.lastBackdropRenderDistance = this.backdropDistance;
+      this.lastBackdropRenderSurface = this.backdropSurfaceProgress;
+      this.lastBackdropRenderFinish = this.backdropFinishRevealProgress;
+      this.lastBackdropRenderLevel = this.backdropEnvironmentLevel;
     }
 
-    this.updateSharkEvent(time, deltaSeconds, loopSnapshot);
+    if (!this.failResolved && !this.finishResolved) {
+      this.updateSharkEvent(time, deltaSeconds, loopSnapshot);
+      this.updateGuidanceMoments(time, loopSnapshot);
+    }
+
     this.updateFinishObjects(time, loopSnapshot);
+    this.updateFailureObjects();
 
     const runBob = loopSnapshot.grounded
       ? Math.sin(loopSnapshot.distanceTravelled * 0.095) * (2 + snapshot.displayLevel * 3.6)
@@ -281,6 +358,23 @@ export class JourneyScene extends Phaser.Scene {
     }
   }
 
+  private shouldRenderBackdrop() {
+    if (!Number.isFinite(this.lastBackdropRenderDistance)) {
+      return true;
+    }
+
+    return (
+      Math.abs(this.backdropDistance - this.lastBackdropRenderDistance) >=
+        journeyConfig.backdrop.redrawDistancePx ||
+      Math.abs(this.backdropSurfaceProgress - this.lastBackdropRenderSurface) >=
+        journeyConfig.backdrop.redrawProgressStep ||
+      Math.abs(this.backdropFinishRevealProgress - this.lastBackdropRenderFinish) >=
+        journeyConfig.backdrop.redrawProgressStep ||
+      Math.abs(this.backdropEnvironmentLevel - this.lastBackdropRenderLevel) >=
+        journeyConfig.backdrop.redrawEmotionStep
+    );
+  }
+
   private renderBackdrop(
     mood: ReturnType<EmotionController['getMood']>,
     distanceTravelled: number,
@@ -290,6 +384,11 @@ export class JourneyScene extends Phaser.Scene {
     const width = journeyConfig.logicalSize.width;
     const height = journeyConfig.logicalSize.height;
     const floorY = runnerConfig.visual.groundLineY;
+    const interiorDarkness = Phaser.Math.Clamp(
+      1 - surfaceProgress * 1.2 - finishRevealProgress * 0.85,
+      0,
+      1
+    );
     const farOffset = -((distanceTravelled * 0.18) % 88);
     const midOffset = -((distanceTravelled * 0.34) % 92);
     const conduitOffset = -((distanceTravelled * 0.58) % 64);
@@ -311,7 +410,15 @@ export class JourneyScene extends Phaser.Scene {
     );
     this.backdrop.fillRect(0, 0, width, height);
 
-    this.backdrop.fillStyle(mood.hazeColor, 0.11);
+    if (interiorDarkness > 0.01) {
+      this.backdrop.fillStyle(0x04070b, 0.18 * interiorDarkness);
+      this.backdrop.fillRect(0, 0, width, height);
+      this.backdrop.fillStyle(0x091017, 0.1 * interiorDarkness);
+      this.backdrop.fillEllipse(width * 0.26, height * 0.28, 208, 168);
+      this.backdrop.fillEllipse(width * 0.74, height * 0.34, 244, 196);
+    }
+
+    this.backdrop.fillStyle(mood.hazeColor, 0.08 + surfaceProgress * 0.03);
     this.backdrop.fillEllipse(width * 0.22, height * 0.24, 170, 138);
     this.backdrop.fillEllipse(width * 0.81, height * 0.2, 208, 156);
     this.backdrop.fillEllipse(width * 0.54, height * 0.34, 244, 188);
@@ -469,6 +576,8 @@ export class JourneyScene extends Phaser.Scene {
   }
 
   private handleShutdown() {
+    this.emitVictoryState(false);
+    this.emitFocusMode(false);
     this.offAudioCue?.();
     this.runnerLoop.destroy();
   }
@@ -527,10 +636,12 @@ export class JourneyScene extends Phaser.Scene {
     panel.lineStyle(2, 0xdce9d6, 0.15);
     panel.fillRoundedRect(-152, -86, 304, 172, 26);
     panel.strokeRoundedRect(-152, -86, 304, 172, 26);
-    panel.fillStyle(0xf1ffbe, 0.05);
-    panel.fillEllipse(0, -48, 96, 34);
+    panel.fillStyle(0xf1ffbe, 0.07);
+    panel.fillEllipse(0, -60, 114, 40);
     panel.lineStyle(2, 0x9ee9b6, 0.1);
-    panel.lineBetween(-88, -6, 88, -6);
+    panel.lineBetween(-96, 2, 96, 2);
+    panel.lineStyle(2, 0xfff8e7, 0.08);
+    panel.strokeEllipse(0, -60, 72, 26);
 
     const title = this.add
       .text(0, -54, FINISH_TITLE, {
@@ -538,11 +649,12 @@ export class JourneyScene extends Phaser.Scene {
         fontSize: '16px',
         color: '#fff8ef',
         align: 'center',
-        wordWrap: { width: 248, useAdvancedWrap: true }
+        wordWrap: { width: 236, useAdvancedWrap: true },
+        lineSpacing: 2
       })
       .setOrigin(0.5);
     const label = this.add
-      .text(0, -20, FINISH_LABEL, {
+      .text(0, -18, FINISH_LABEL, {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '24px',
         color: '#e9ffaf',
@@ -550,55 +662,96 @@ export class JourneyScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const body = this.add
-      .text(0, 18, FINISH_BODY, {
+      .text(0, 24, FINISH_BODY, {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '15px',
         color: '#fff7ec',
         align: 'center',
-        wordWrap: { width: 236, useAdvancedWrap: true },
+        wordWrap: { width: 224, useAdvancedWrap: true },
         lineSpacing: 4
       })
       .setOrigin(0.5);
     const closing = this.add
-      .text(0, 54, FINISH_CLOSING, {
+      .text(0, 58, FINISH_CLOSING, {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '13px',
         color: '#cfe8d9',
         align: 'center',
-        wordWrap: { width: 244, useAdvancedWrap: true },
+        wordWrap: { width: 226, useAdvancedWrap: true },
         lineSpacing: 4
       })
       .setOrigin(0.5);
 
+    return this.add.container(x, y, [panel, title, label, body, closing]);
+  }
+
+  private createFailStage(x: number, y: number) {
+    const panel = this.add.graphics();
+    panel.fillStyle(0x10151d, 0.92);
+    panel.lineStyle(2, 0xdce9d6, 0.12);
+    panel.fillRoundedRect(-140, -76, 280, 152, 24);
+    panel.strokeRoundedRect(-140, -76, 280, 152, 24);
+    panel.fillStyle(0xf1ffbe, 0.04);
+    panel.fillEllipse(0, -26, 92, 28);
+
+    const title = this.add
+      .text(0, -34, FAIL_TITLE, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '20px',
+        color: '#fff8ef',
+        align: 'center'
+      })
+      .setOrigin(0.5);
+    const body = this.add
+      .text(0, 4, FAIL_BODY, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '15px',
+        color: '#f3f0e8',
+        align: 'center',
+        wordWrap: { width: 220, useAdvancedWrap: true },
+        lineSpacing: 4
+      })
+      .setOrigin(0.5);
+    const closing = this.add
+      .text(0, 42, FAIL_CLOSING, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '13px',
+        color: '#cfe8d9',
+        align: 'center'
+      })
+      .setOrigin(0.5);
+
     return this.add
-      .container(x, y, [
-        panel,
-        title,
-        label,
-        body,
-        closing
-      ])
-      .setDepth(6.6)
+      .container(x, y, [panel, title, body, closing])
+      .setDepth(6.62)
       .setAlpha(0)
-      .setScale(0.9);
+      .setScale(0.92)
+      .setSize(280, 152);
   }
 
   private updateFinishObjects(time: number, loopSnapshot: RunnerLoopSnapshot) {
+    if (this.failResolved && !this.finishResolved) {
+      this.ingredient.setAlpha(0);
+      this.finishStage.setAlpha(0);
+      return;
+    }
+
     const exitX = journeyConfig.logicalSize.width - 44 + loopSnapshot.finishRevealProgress * 6;
     const exitY = 190 - loopSnapshot.surfaceProgress * 28;
     const hover = Math.sin(time * 0.0042) * 3.6;
     const sequenceEase = Phaser.Math.Easing.Cubic.Out(this.finishSequence);
     const sequenceBack = Phaser.Math.Easing.Back.Out(this.finishSequence);
-    const rewardX = Phaser.Math.Linear(exitX, journeyConfig.logicalSize.width * 0.5, sequenceEase);
-    const rewardY = Phaser.Math.Linear(exitY + hover, 204, sequenceEase);
-    const targetMessageAlpha = this.finishResolved ? 0.98 : 0;
-    const nextMessageAlpha = Phaser.Math.Linear(this.finishMessage.alpha, targetMessageAlpha, 0.1);
-    const nextMessageScale = Phaser.Math.Linear(
-      this.finishMessage.scaleX,
+    const previewAlpha = this.finishResolved
+      ? Phaser.Math.Linear(this.ingredient.alpha, 0, 0.18)
+      : Math.max(loopSnapshot.finishRevealProgress, 0);
+    const stageAlphaTarget = this.finishResolved ? 0.98 : 0;
+    const nextStageAlpha = Phaser.Math.Linear(this.finishStage.alpha, stageAlphaTarget, 0.12);
+    const nextStageScale = Phaser.Math.Linear(
+      this.finishStage.scaleX,
       this.finishResolved ? 1 : 0.9,
-      0.1
+      0.12
     );
-    const scrimTarget = this.finishResolved ? 0.34 : 0;
+    const scrimTarget = this.finishResolved ? 0.22 : 0;
 
     this.finishGlow
       .setPosition(
@@ -614,32 +767,215 @@ export class JourneyScene extends Phaser.Scene {
         0.02 +
           loopSnapshot.surfaceProgress * 0.12 +
           loopSnapshot.finishRevealProgress * 0.16 +
-          this.finishPulse * 0.16 +
-          sequenceEase * 0.08
+          this.finishPulse * 0.1 +
+          sequenceEase * 0.05
       );
 
     this.finishScrim.setAlpha(Phaser.Math.Linear(this.finishScrim.alpha, scrimTarget, 0.08));
 
     this.ingredient
-      .setPosition(rewardX, rewardY)
-      .setAlpha(Math.max(loopSnapshot.finishRevealProgress, this.finishResolved ? 1 : 0))
+      .setPosition(exitX, exitY + hover)
+      .setAlpha(previewAlpha)
       .setScale(0.92 + loopSnapshot.finishRevealProgress * 0.2 + this.finishPulse * 0.12 + sequenceBack * 0.2)
       .setRotation(Math.sin(time * 0.0032) * 0.08 - loopSnapshot.finishRevealProgress * 0.04 + sequenceEase * 0.03);
 
-    this.finishMessage
-      .setAlpha(nextMessageAlpha)
-      .setScale(nextMessageScale)
-      .setPosition(journeyConfig.logicalSize.width * 0.5, 442 - sequenceEase * 6);
+    this.finishReward
+      .setScale(1.02 + this.finishPulse * 0.08 + sequenceBack * 0.12)
+      .setRotation(Math.sin(time * 0.0031) * 0.04 - sequenceEase * 0.02);
+
+    this.finishStage
+      .setAlpha(nextStageAlpha)
+      .setScale(nextStageScale)
+      .setPosition(journeyConfig.logicalSize.width * 0.5, 432 - sequenceEase * 12);
 
     if (loopSnapshot.levelComplete && !this.finishResolved) {
-      this.finishResolved = true;
-      this.finishPulse = 1;
-       audioCueBus.emit({
-        type: 'victory_win',
-        intensity: 1.1
-      });
-      this.cameras.main.flash(220, 238, 255, 214, false);
+      this.beginVictoryBeat();
     }
+  }
+
+  private updateFailureObjects() {
+    const targetAlpha = this.failResolved ? 1 : 0;
+    const targetScale = this.failResolved ? 1 : 0.92;
+    const targetY = this.failResolved ? 380 : 388;
+
+    this.failStage
+      .setAlpha(Phaser.Math.Linear(this.failStage.alpha, targetAlpha, 0.16))
+      .setScale(Phaser.Math.Linear(this.failStage.scaleX, targetScale, 0.16))
+      .setPosition(this.failStage.x, Phaser.Math.Linear(this.failStage.y, targetY, 0.16));
+  }
+
+  private beginVictoryBeat() {
+    if (this.finishResolved) {
+      return;
+    }
+
+    this.finishResolved = true;
+    this.finishPulse = 1;
+    this.haltSharkEvent();
+    this.emitFocusMode(true);
+    this.emitVictoryState(true);
+
+    if (!this.victoryFrozen) {
+      this.runnerLoop.setFrozen(true);
+      this.victoryFrozen = true;
+    }
+
+    audioCueBus.emit({
+      type: 'victory_win',
+      intensity: 1.1
+    });
+    this.cameras.main.flash(140, 236, 255, 214, false);
+  }
+
+  private beginFailureBeat() {
+    if (this.failResolved || this.finishResolved) {
+      return;
+    }
+
+    this.failResolved = true;
+    this.restartQueued = false;
+    this.finishStage.setAlpha(0);
+    this.ingredient.setAlpha(0);
+    this.input.enabled = true;
+    this.children.bringToTop(this.failStage);
+    this.children.bringToTop(this.retryOverlay);
+    this.retryOverlay
+      .setVisible(true)
+      .setAlpha(0.001)
+      .setInteractive()
+      .off('pointerdown', this.restartFromFailure, this)
+      .on('pointerdown', this.restartFromFailure, this);
+    this.haltSharkEvent();
+    this.emitFocusMode(true);
+  }
+
+  private restartFromFailure(pointer: Phaser.Input.Pointer) {
+    this.logRetryDebug('retry target hit', {
+      button: pointer.button,
+      failResolved: this.failResolved,
+      inputEnabled: this.input.enabled,
+      restartQueued: this.restartQueued,
+      x: Math.round(pointer.x),
+      y: Math.round(pointer.y)
+    });
+
+    if (!pointer.wasTouch && pointer.button !== 0) {
+      this.logRetryDebug('restart ignored', {
+        button: pointer.button,
+        reason: 'non-primary pointer'
+      });
+      return;
+    }
+
+    if (!this.failResolved) {
+      this.logRetryDebug('restart ignored', {
+        reason: 'fail-state not active'
+      });
+      return;
+    }
+
+    if (!this.input.enabled) {
+      this.logRetryDebug('restart ignored', {
+        reason: 'scene input disabled'
+      });
+      return;
+    }
+
+    if (this.restartQueued) {
+      this.logRetryDebug('retry guard active', {
+        reason: 'restart already queued'
+      });
+      return;
+    }
+
+    this.restartQueued = true;
+    this.time.delayedCall(0, this.triggerRestartFromFailure, undefined, this);
+  }
+
+  private triggerRestartFromFailure() {
+    if (!this.failResolved) {
+      this.restartQueued = false;
+      this.logRetryDebug('restart ignored', {
+        reason: 'fail-state cleared before restart'
+      });
+      return;
+    }
+
+    this.logRetryDebug('restart actually triggered');
+    this.emitFocusMode(false);
+    sessionState.restartRun();
+    this.scene.restart();
+  }
+
+  private haltSharkEvent() {
+    this.sharkActive = false;
+    this.sharkTagged = false;
+    this.shark.setVisible(false);
+    this.sharkShadow.setVisible(false);
+    this.sharkBurst = Math.min(this.sharkBurst, 0.16);
+  }
+
+  private emitVictoryState(active: boolean) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('mateo:victory-state', {
+        detail: {
+          active
+        }
+      })
+    );
+  }
+
+  private emitFocusMode(active: boolean) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('mateo:focus-mode', {
+        detail: {
+          active
+        }
+      })
+    );
+  }
+
+  private emitGuidanceLine(text: string, durationMs = 1800, time = 0) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    this.lastGuidanceAt = time;
+    window.dispatchEvent(
+      new CustomEvent('mateo:guidance-line', {
+        detail: {
+          text,
+          durationMs
+        }
+      })
+    );
+  }
+
+  private updateGuidanceMoments(time: number, loopSnapshot: RunnerLoopSnapshot) {
+    if (
+      loopSnapshot.currentPhraseId !== this.lastSeenPhraseId &&
+      loopSnapshot.currentPhraseFamily === 'recovery' &&
+      time - this.lastGuidanceAt > 6200
+    ) {
+      const line = SUPPORTIVE_LINES[this.guidanceIndex % SUPPORTIVE_LINES.length]!;
+      this.guidanceIndex += 1;
+      this.emitGuidanceLine(line, 1800, time);
+    }
+
+    if (!this.surfaceGuidanceShown && loopSnapshot.surfaceProgress >= 0.56 && time - this.lastGuidanceAt > 4200) {
+      this.surfaceGuidanceShown = true;
+      this.emitGuidanceLine('Ya casi ves mas luz.', 1800, time);
+    }
+
+    this.lastSeenPhraseId = loopSnapshot.currentPhraseId;
   }
 
   private updateSharkEvent(time: number, deltaSeconds: number, loopSnapshot: RunnerLoopSnapshot) {
@@ -681,6 +1017,12 @@ export class JourneyScene extends Phaser.Scene {
     if (!this.sharkTagged && Math.abs(x - this.hero.x) < 42 && Math.abs(y - this.hero.y) < 68) {
       this.sharkTagged = true;
       this.sharkBurst = 1;
+
+      if (time - this.lastGuidanceAt > 7200 && Phaser.Math.Between(0, 100) < 42) {
+        const line = SHARK_LINES[this.sharkGuidanceIndex % SHARK_LINES.length]!;
+        this.sharkGuidanceIndex += 1;
+        this.emitGuidanceLine(line, 1500, time);
+      }
     }
 
     if (this.sharkProgress >= 1) {
@@ -696,34 +1038,80 @@ export class JourneyScene extends Phaser.Scene {
       return;
     }
 
+    const debugGraphics = this.debugGraphics;
+    const debugEntities = this.runnerLoop.debugSnapshot();
     const heroBoundsX = loopSnapshot.heroX - runnerConfig.hero.hitbox.width / 2;
     const heroBoundsY = loopSnapshot.heroY - runnerConfig.hero.hitbox.topOffset;
     const heroCenterY = loopSnapshot.heroY - 26;
     const pulse = 0.2 + Math.sin(time * 0.0045) * 0.04;
 
-    this.debugGraphics.clear();
-    this.debugGraphics.fillStyle(0xa8ff6f, 0.07);
-    this.debugGraphics.fillRect(loopSnapshot.heroX + 92, 64, 74, 500);
-    this.debugGraphics.lineStyle(1, 0xffffff, 0.34);
-    this.debugGraphics.strokeRect(
+    debugGraphics.clear();
+    debugGraphics.fillStyle(0xa8ff6f, 0.07);
+    debugGraphics.fillRect(loopSnapshot.heroX + 92, 64, 74, 500);
+    debugGraphics.lineStyle(1, 0xffffff, 0.34);
+    debugGraphics.strokeRect(
       heroBoundsX,
       heroBoundsY,
       runnerConfig.hero.hitbox.width,
       runnerConfig.hero.hitbox.topOffset + runnerConfig.hero.hitbox.bottomOffset
     );
-    this.debugGraphics.strokeCircle(loopSnapshot.heroX + 4, heroCenterY, runnerConfig.rewards.collectRadius);
+    debugGraphics.strokeCircle(loopSnapshot.heroX + 4, heroCenterY, runnerConfig.rewards.collectRadius);
+
+    debugEntities.forEach((entity) => {
+      const color =
+        entity.role === 'hazard'
+          ? 0xff7a63
+          : entity.role === 'collectible'
+            ? 0x7cf4df
+            : 0xb8c2d4;
+      const fillAlpha =
+        entity.role === 'hazard'
+          ? entity.active
+            ? 0.14
+            : 0.06
+          : entity.role === 'collectible'
+            ? 0.08
+            : 0.04;
+      const strokeAlpha = entity.active ? 0.84 : 0.38;
+
+      debugGraphics.fillStyle(color, fillAlpha);
+      debugGraphics.fillRect(
+        entity.hitbox.x,
+        entity.hitbox.y,
+        entity.hitbox.width,
+        entity.hitbox.height
+      );
+      debugGraphics.lineStyle(entity.role === 'hazard' ? 2 : 1, color, strokeAlpha);
+      debugGraphics.strokeRect(
+        entity.hitbox.x,
+        entity.hitbox.y,
+        entity.hitbox.width,
+        entity.hitbox.height
+      );
+    });
+
+    if (this.shark.visible) {
+      debugGraphics.lineStyle(1, 0xb8c2d4, 0.6);
+      debugGraphics.strokeEllipse(this.shark.x, this.shark.y, 74, 34);
+    }
 
     if (loopSnapshot.projectedLandingX) {
-      this.debugGraphics.lineStyle(2, 0xe6ff81, 0.5 + pulse);
-      this.debugGraphics.beginPath();
-      this.debugGraphics.moveTo(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY - 18);
-      this.debugGraphics.lineTo(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY + 22);
-      this.debugGraphics.strokePath();
-      this.debugGraphics.fillStyle(0xe6ff81, 0.22);
-      this.debugGraphics.fillCircle(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY + 10, 6);
+      debugGraphics.lineStyle(2, 0xe6ff81, 0.5 + pulse);
+      debugGraphics.beginPath();
+      debugGraphics.moveTo(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY - 18);
+      debugGraphics.lineTo(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY + 22);
+      debugGraphics.strokePath();
+      debugGraphics.fillStyle(0xe6ff81, 0.22);
+      debugGraphics.fillCircle(loopSnapshot.projectedLandingX, runnerConfig.visual.groundLineY + 10, 6);
     }
 
     if (time - this.lastDebugEmit > 90) {
+      const activeHazards =
+        debugEntities
+          .filter((entity) => entity.role === 'hazard' && entity.active)
+          .map((entity) => `${entity.label}@${Math.round(entity.screenX)}`)
+          .join(', ') || 'none';
+
       window.dispatchEvent(
         new CustomEvent('mateo:runner-debug', {
           detail: {
@@ -734,11 +1122,34 @@ export class JourneyScene extends Phaser.Scene {
               loopSnapshot.projectedLandingX === null
                 ? null
                 : Math.round(loopSnapshot.projectedLandingX),
-            grounded: loopSnapshot.grounded
+            grounded: loopSnapshot.grounded,
+            hazards: activeHazards,
+            decor: this.getDecorativeDebugLabels().join(', '),
+            retry: this.getRetryDebugState()
           }
         })
       );
       this.lastDebugEmit = time;
     }
+  }
+
+  private getRetryDebugState() {
+    if (!this.failResolved) {
+      return 'idle';
+    }
+
+    return this.restartQueued ? 'queued' : 'ready';
+  }
+
+  private getDecorativeDebugLabels() {
+    return DEBUG_DECORATIVE_FAMILIES.filter((label) => label !== 'shark-friend' || this.shark.visible);
+  }
+
+  private logRetryDebug(message: string, details?: Record<string, unknown>) {
+    if (!this.showDebug) {
+      return;
+    }
+
+    console.info('[retry-flow]', message, details ?? {});
   }
 }

@@ -79,6 +79,18 @@ class SessionStateStore {
     this.emit();
   }
 
+  restartRun() {
+    this.state = {
+      awakeningLevel: this.state.awakeningLevel,
+      collectedSparks: this.state.collectedSparks,
+      currentPulse: 0.08,
+      currentChain: 0,
+      bestChain: 0
+    };
+
+    this.emit();
+  }
+
   snapshot(): SessionSnapshot {
     return createSnapshot(this.state);
   }
