@@ -10,8 +10,10 @@ import { EmotionController } from '@/game/systems/emotion/EmotionController';
 import { RunnerLoopSystem, type RunnerLoopSnapshot } from '@/game/systems/runner/RunnerLoopSystem';
 
 const SHARK_TEXTURE_KEY = 'shark-friend';
-const FINISH_MESSAGE =
-  'Encontraste el primer ingrediente.\nEl planeta todavía puede sanar.\nSigamos construyendo un mundo nuevo juntos.';
+const FINISH_TITLE = 'Ingrediente 1 encontrado';
+const FINISH_LABEL = 'Nota sol';
+const FINISH_BODY = 'El planeta todavía puede sanar.';
+const FINISH_CLOSING = 'Sigamos construyendo un mundo nuevo juntos.';
 
 export class JourneyScene extends Phaser.Scene {
   private readonly showDebug =
@@ -29,6 +31,7 @@ export class JourneyScene extends Phaser.Scene {
   private readonly conduitOffsets = [12, -8, 18, -14, 10, -4];
 
   private backdrop!: Phaser.GameObjects.Graphics;
+  private finishScrim!: Phaser.GameObjects.Rectangle;
   private finishGlow!: Phaser.GameObjects.Ellipse;
   private heroShadow!: Phaser.GameObjects.Ellipse;
   private heroAura!: Phaser.GameObjects.Ellipse;
@@ -49,6 +52,8 @@ export class JourneyScene extends Phaser.Scene {
   private lastDebugEmit = 0;
   private finishPulse = 0;
   private finishResolved = false;
+  private finishSequence = 0;
+  private victoryFrozen = false;
   private sharkBurst = 0;
   private sharkCooldown = 3.8;
   private sharkDuration = 1.9;
@@ -72,12 +77,17 @@ export class JourneyScene extends Phaser.Scene {
     this.lastSurfaceStep = -1;
     this.finishPulse = 0;
     this.finishResolved = false;
+    this.finishSequence = 0;
+    this.victoryFrozen = false;
     this.sharkBurst = 0;
     this.sharkCooldown = 3.8;
     this.sharkActive = false;
     this.sharkTagged = false;
 
     this.backdrop = this.add.graphics().setDepth(0);
+    this.finishScrim = this.add
+      .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x0a0d12, 0)
+      .setDepth(5.8);
     this.finishGlow = this.add
       .ellipse(width - 22, 186, 164, 320, 0xf2ffce, 0)
       .setBlendMode(Phaser.BlendModes.ADD)
@@ -99,7 +109,7 @@ export class JourneyScene extends Phaser.Scene {
     this.heroRenderScaleY = this.baseHeroScale;
     this.hero.setScale(this.baseHeroScale);
     this.ingredient = this.createIngredient(width - 52, 188);
-    this.finishMessage = this.createFinishMessage(width * 0.5, 126);
+    this.finishMessage = this.createFinishMessage(width * 0.5, 448);
     this.sharkShadow = this.add
       .ellipse(-120, runnerConfig.visual.groundLineY - 44, 58, 12, 0x09080d, 0.1)
       .setDepth(4.45)
@@ -125,6 +135,15 @@ export class JourneyScene extends Phaser.Scene {
 
     this.runnerLoop.update(deltaSeconds, time, mood, snapshot.displayLevel);
     const loopSnapshot = this.runnerLoop.snapshot();
+
+    if (this.finishResolved) {
+      this.finishSequence = Math.min(1, this.finishSequence + deltaSeconds * 2.6);
+
+      if (!this.victoryFrozen) {
+        this.runnerLoop.setFrozen(true);
+        this.victoryFrozen = true;
+      }
+    }
 
     this.feedback.collect = Math.max(0, this.feedback.collect - deltaSeconds * 3);
     this.feedback.chain = Math.max(0, this.feedback.chain - deltaSeconds * 1.6);
@@ -183,6 +202,10 @@ export class JourneyScene extends Phaser.Scene {
     const impactDrop = loopSnapshot.staggerAmount * 16 + this.feedback.impact * 10;
     const rise = loopSnapshot.collectBurst * 8 + this.feedback.chain * 6;
     const landingSquash = loopSnapshot.landingBurst * 0.08;
+    const victoryBounce =
+      this.finishResolved
+        ? Math.sin(this.finishSequence * Math.PI) * (1 - this.finishSequence * 0.28) * 7
+        : 0;
     const heroScale =
       this.baseHeroScale *
       renderMood.heroScale *
@@ -208,7 +231,8 @@ export class JourneyScene extends Phaser.Scene {
           rise +
           landingSquash * 6 +
           driftLift -
-          loopSnapshot.surfaceProgress * 6
+          loopSnapshot.surfaceProgress * 6 -
+          victoryBounce
       )
       .setScale(this.heroRenderScaleX, this.heroRenderScaleY);
 
@@ -451,34 +475,40 @@ export class JourneyScene extends Phaser.Scene {
 
   private createIngredient(x: number, y: number) {
     const halo = this.add
-      .ellipse(0, 0, 74, 74, 0xf4ffb6, 0.18)
+      .ellipse(0, 0, 88, 88, 0xf4ffb6, 0.2)
       .setBlendMode(Phaser.BlendModes.ADD);
-    const outerRing = this.add.ellipse(0, 0, 42, 48, 0xffffff, 0).setStrokeStyle(2, 0x8eb0a3, 0.24);
-    const innerRing = this.add.ellipse(0, 0, 30, 36, 0xffffff, 0).setStrokeStyle(2, 0xb9e0cf, 0.16);
-    const noteHead = this.add.ellipse(-7, 10, 22, 17, 0xfaf5d6, 0.98).setStrokeStyle(2, 0x607368, 0.42);
-    const stem = this.add.rectangle(4, -10, 6, 38, 0xfaf5d6, 0.98).setRotation(-0.04).setStrokeStyle(2, 0x607368, 0.32);
-    const flag = this.add.triangle(18, -24, -2, 0, 12, -3, 0, 17, 0x96efb2, 0.98).setRotation(-0.18).setStrokeStyle(2, 0x3b6b50, 0.26);
-    const core = this.add.ellipse(-4, 6, 8, 8, 0x9bffb3, 0.94);
-    const sparkleA = this.add.ellipse(24, -10, 5, 5, 0xfff9e8, 0.84);
-    const sparkleB = this.add.ellipse(-18, -18, 4, 4, 0xfff9e8, 0.72);
-    const rayA = this.add.rectangle(-28, 2, 10, 2, 0xe8ffd0, 0.54).setRotation(-0.3);
-    const rayB = this.add.rectangle(28, 14, 12, 2, 0xe8ffd0, 0.48).setRotation(0.42);
+    const outerRing = this.add.ellipse(0, 0, 56, 62, 0xffffff, 0).setStrokeStyle(2, 0x8eb0a3, 0.22);
+    const middleRing = this.add.ellipse(0, 0, 44, 50, 0xffffff, 0).setStrokeStyle(2, 0xd4ecd8, 0.18);
+    const innerRing = this.add.ellipse(0, 0, 32, 38, 0xffffff, 0).setStrokeStyle(2, 0xb9e0cf, 0.12);
+    const noteHead = this.add.ellipse(-7, 12, 24, 18, 0xfaf5d6, 0.98).setStrokeStyle(2, 0x607368, 0.42);
+    const stem = this.add.rectangle(5, -12, 6, 42, 0xfaf5d6, 0.98).setRotation(-0.04).setStrokeStyle(2, 0x607368, 0.32);
+    const flag = this.add.triangle(19, -28, -2, 0, 13, -4, 0, 19, 0x96efb2, 0.98).setRotation(-0.18).setStrokeStyle(2, 0x3b6b50, 0.26);
+    const core = this.add.ellipse(-4, 8, 8, 8, 0x9bffb3, 0.94);
+    const sparkleA = this.add.ellipse(31, -15, 5, 5, 0xfff9e8, 0.84);
+    const sparkleB = this.add.ellipse(-23, -24, 4, 4, 0xfff9e8, 0.72);
+    const sparkleC = this.add.ellipse(-26, 24, 4, 4, 0xf4ffcc, 0.68);
+    const rayA = this.add.rectangle(-34, 2, 12, 2, 0xe8ffd0, 0.54).setRotation(-0.3);
+    const rayB = this.add.rectangle(34, 16, 14, 2, 0xe8ffd0, 0.48).setRotation(0.42);
+    const rayC = this.add.rectangle(8, -40, 10, 2, 0xe8ffd0, 0.44).setRotation(0.1);
 
     return this.add
       .container(x, y, [
         halo,
         outerRing,
+        middleRing,
         innerRing,
         rayA,
         rayB,
+        rayC,
         noteHead,
         stem,
         flag,
         core,
         sparkleA,
-        sparkleB
+        sparkleB,
+        sparkleC
       ])
-      .setDepth(4.55)
+      .setDepth(6.35)
       .setAlpha(0);
   }
 
@@ -493,101 +523,121 @@ export class JourneyScene extends Phaser.Scene {
 
   private createFinishMessage(x: number, y: number) {
     const panel = this.add.graphics();
-    panel.fillStyle(0x111720, 0.86);
-    panel.lineStyle(2, 0xdce9d6, 0.14);
-    panel.fillRoundedRect(-148, -66, 296, 132, 24);
-    panel.strokeRoundedRect(-148, -66, 296, 132, 24);
-    panel.fillStyle(0xf1ffbe, 0.07);
-    panel.fillEllipse(-98, -2, 72, 72);
-    panel.lineStyle(2, 0x9ee9b6, 0.12);
-    panel.strokeEllipse(-98, -2, 54, 54);
-    panel.lineStyle(2, 0xdce9d6, 0.08);
-    panel.lineBetween(-46, -36, -46, 40);
+    panel.fillStyle(0x0f1520, 0.9);
+    panel.lineStyle(2, 0xdce9d6, 0.15);
+    panel.fillRoundedRect(-152, -86, 304, 172, 26);
+    panel.strokeRoundedRect(-152, -86, 304, 172, 26);
+    panel.fillStyle(0xf1ffbe, 0.05);
+    panel.fillEllipse(0, -48, 96, 34);
+    panel.lineStyle(2, 0x9ee9b6, 0.1);
+    panel.lineBetween(-88, -6, 88, -6);
 
-    const eyebrow = this.add
-      .text(14, -40, 'Ingrediente 1', {
-        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
-        fontSize: '10px',
-        color: '#cfe8d9',
-        letterSpacing: 1.4
-      })
-      .setOrigin(0, 0.5);
     const title = this.add
-      .text(14, -18, 'Nota sol', {
+      .text(0, -54, FINISH_TITLE, {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
-        fontSize: '20px',
-        color: '#fff8ef'
+        fontSize: '16px',
+        color: '#fff8ef',
+        align: 'center',
+        wordWrap: { width: 248, useAdvancedWrap: true }
       })
-      .setOrigin(0, 0.5);
-    const iconHalo = this.add
-      .ellipse(-98, -2, 56, 56, 0xf4ffb6, 0.16)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    const iconHead = this.add.ellipse(-106, 8, 18, 14, 0xfaf5d6, 0.98).setStrokeStyle(2, 0x607368, 0.36);
-    const iconStem = this.add.rectangle(-98, -12, 5, 30, 0xfaf5d6, 0.98).setRotation(-0.04).setStrokeStyle(2, 0x607368, 0.28);
-    const iconFlag = this.add.triangle(-82, -26, -2, 0, 10, -2, 0, 14, 0x96efb2, 0.96).setRotation(-0.2);
-    const iconSpark = this.add.ellipse(-76, 12, 5, 5, 0xfffae8, 0.82);
-    const message = this.add
-      .text(14, 16, FINISH_MESSAGE, {
+      .setOrigin(0.5);
+    const label = this.add
+      .text(0, -20, FINISH_LABEL, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '24px',
+        color: '#e9ffaf',
+        align: 'center'
+      })
+      .setOrigin(0.5);
+    const body = this.add
+      .text(0, 18, FINISH_BODY, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '15px',
+        color: '#fff7ec',
+        align: 'center',
+        wordWrap: { width: 236, useAdvancedWrap: true },
+        lineSpacing: 4
+      })
+      .setOrigin(0.5);
+    const closing = this.add
+      .text(0, 54, FINISH_CLOSING, {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '13px',
-        color: '#fff7ec',
-        align: 'left',
-        wordWrap: { width: 176, useAdvancedWrap: true },
-        lineSpacing: 6
+        color: '#cfe8d9',
+        align: 'center',
+        wordWrap: { width: 244, useAdvancedWrap: true },
+        lineSpacing: 4
       })
-      .setOrigin(0, 0.5);
+      .setOrigin(0.5);
 
     return this.add
       .container(x, y, [
         panel,
-        iconHalo,
-        iconHead,
-        iconStem,
-        iconFlag,
-        iconSpark,
-        eyebrow,
         title,
-        message
+        label,
+        body,
+        closing
       ])
       .setDepth(6.6)
       .setAlpha(0)
-      .setScale(0.94);
+      .setScale(0.9);
   }
 
   private updateFinishObjects(time: number, loopSnapshot: RunnerLoopSnapshot) {
     const exitX = journeyConfig.logicalSize.width - 44 + loopSnapshot.finishRevealProgress * 6;
     const exitY = 190 - loopSnapshot.surfaceProgress * 28;
     const hover = Math.sin(time * 0.0042) * 3.6;
+    const sequenceEase = Phaser.Math.Easing.Cubic.Out(this.finishSequence);
+    const sequenceBack = Phaser.Math.Easing.Back.Out(this.finishSequence);
+    const rewardX = Phaser.Math.Linear(exitX, journeyConfig.logicalSize.width * 0.5, sequenceEase);
+    const rewardY = Phaser.Math.Linear(exitY + hover, 204, sequenceEase);
     const targetMessageAlpha = this.finishResolved ? 0.98 : 0;
-    const nextMessageAlpha = Phaser.Math.Linear(this.finishMessage.alpha, targetMessageAlpha, 0.08);
+    const nextMessageAlpha = Phaser.Math.Linear(this.finishMessage.alpha, targetMessageAlpha, 0.1);
     const nextMessageScale = Phaser.Math.Linear(
       this.finishMessage.scaleX,
-      this.finishResolved ? 1.02 : 0.94,
-      0.08
+      this.finishResolved ? 1 : 0.9,
+      0.1
     );
+    const scrimTarget = this.finishResolved ? 0.34 : 0;
 
     this.finishGlow
-      .setPosition(journeyConfig.logicalSize.width - 18, 180 - loopSnapshot.surfaceProgress * 12)
-      .setScale(1 + loopSnapshot.finishRevealProgress * 0.34, 1 + loopSnapshot.surfaceProgress * 0.26)
+      .setPosition(
+        Phaser.Math.Linear(journeyConfig.logicalSize.width - 18, journeyConfig.logicalSize.width * 0.5, sequenceEase),
+        Phaser.Math.Linear(180 - loopSnapshot.surfaceProgress * 12, 204, sequenceEase)
+      )
+      .setScale(
+        1 + loopSnapshot.finishRevealProgress * 0.34 + sequenceEase * 0.42,
+        1 + loopSnapshot.surfaceProgress * 0.26 + sequenceEase * 0.2
+      )
       .setFillStyle(
         0xf2ffce,
-        0.02 + loopSnapshot.surfaceProgress * 0.12 + loopSnapshot.finishRevealProgress * 0.16 + this.finishPulse * 0.16
+        0.02 +
+          loopSnapshot.surfaceProgress * 0.12 +
+          loopSnapshot.finishRevealProgress * 0.16 +
+          this.finishPulse * 0.16 +
+          sequenceEase * 0.08
       );
 
+    this.finishScrim.setAlpha(Phaser.Math.Linear(this.finishScrim.alpha, scrimTarget, 0.08));
+
     this.ingredient
-      .setPosition(exitX, exitY + hover)
+      .setPosition(rewardX, rewardY)
       .setAlpha(Math.max(loopSnapshot.finishRevealProgress, this.finishResolved ? 1 : 0))
-      .setScale(0.92 + loopSnapshot.finishRevealProgress * 0.3 + this.finishPulse * 0.2)
-      .setRotation(Math.sin(time * 0.0032) * 0.08 - loopSnapshot.finishRevealProgress * 0.04);
+      .setScale(0.92 + loopSnapshot.finishRevealProgress * 0.2 + this.finishPulse * 0.12 + sequenceBack * 0.2)
+      .setRotation(Math.sin(time * 0.0032) * 0.08 - loopSnapshot.finishRevealProgress * 0.04 + sequenceEase * 0.03);
 
     this.finishMessage
       .setAlpha(nextMessageAlpha)
       .setScale(nextMessageScale)
-      .setPosition(journeyConfig.logicalSize.width * 0.5, 124 - this.finishPulse * 6);
+      .setPosition(journeyConfig.logicalSize.width * 0.5, 442 - sequenceEase * 6);
 
     if (loopSnapshot.levelComplete && !this.finishResolved) {
       this.finishResolved = true;
       this.finishPulse = 1;
+       audioCueBus.emit({
+        type: 'victory_win',
+        intensity: 1.1
+      });
       this.cameras.main.flash(220, 238, 255, 214, false);
     }
   }

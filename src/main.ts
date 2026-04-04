@@ -51,6 +51,10 @@ if (!hudRoot) {
   throw new Error('HUD root not found.');
 }
 
+const showDebug =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('debug') === '1';
+
 const hud = createHud(hudRoot);
 const audioLayer = createReactiveAudioLayer();
 const entryShell = document.querySelector<HTMLElement>('#entry-shell');
@@ -105,8 +109,10 @@ const startFromEntry = () => {
 
 entryButton?.addEventListener('pointerdown', startFromEntry, { passive: true });
 
-(window as Window & { __MATEO_RUN_TELEMETRY__?: typeof runTelemetryStore }).__MATEO_RUN_TELEMETRY__ =
-  runTelemetryStore;
+if (showDebug) {
+  (window as Window & { __MATEO_RUN_TELEMETRY__?: typeof runTelemetryStore }).__MATEO_RUN_TELEMETRY__ =
+    runTelemetryStore;
+}
 
 let persistTimeout = 0;
 

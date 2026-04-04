@@ -74,6 +74,7 @@ export class RunnerLoopSystem {
 
   private heroY = runnerConfig.hero.runY;
   private heroVelocityY = 0;
+  private frozen = false;
   private grounded = true;
   private pointerHeld = false;
   private jumpBufferSeconds: number = 0;
@@ -101,6 +102,12 @@ export class RunnerLoopSystem {
   }
 
   update(deltaSeconds: number, time: number, mood: MoodSnapshot, displayLevel: number) {
+    if (this.frozen) {
+      this.updateHeroPhysics(deltaSeconds);
+      this.updateFeedback(deltaSeconds);
+      return;
+    }
+
     this.updateHeroPhysics(deltaSeconds);
     this.updateFeedback(deltaSeconds);
 
@@ -167,12 +174,26 @@ export class RunnerLoopSystem {
     this.entities.length = 0;
   }
 
+  setFrozen(nextFrozen: boolean) {
+    this.frozen = nextFrozen;
+
+    if (nextFrozen) {
+      this.pointerHeld = false;
+      this.jumpBufferSeconds = 0;
+      this.holdJumpSeconds = 0;
+    }
+  }
+
   private bindInput() {
     this.scene.input.on('pointerdown', this.handlePointerDown, this);
     this.scene.input.on('pointerup', this.handlePointerUp, this);
   }
 
   private handlePointerDown() {
+    if (this.frozen) {
+      return;
+    }
+
     audioCueBus.unlockFromGesture();
     this.pointerHeld = true;
     this.jumpBufferSeconds = runnerConfig.jump.bufferSeconds;
@@ -399,6 +420,7 @@ export class RunnerLoopSystem {
     if (variant === 'warden') {
       primary.push(
         this.scene.add.rectangle(0, 6, 24, 30, mood.shadowColor, 0.94),
+        this.scene.add.rectangle(0, -3, 28, 8, mood.shadowColor, 0.94),
         this.scene.add.ellipse(0, -18, 18, 17, mood.shadowColor, 0.94),
         this.scene.add.rectangle(-9, -2, 7, 18, mood.shadowColor, 0.94),
         this.scene.add.rectangle(9, -2, 7, 18, mood.shadowColor, 0.94)
@@ -406,6 +428,7 @@ export class RunnerLoopSystem {
       secondary.push(
         this.scene.add.rectangle(0, -29, 28, 6, mood.floorLineColor, 0.88),
         this.scene.add.ellipse(0, -18, 6, 6, mood.markerColor, 0.88),
+        this.scene.add.rectangle(0, -4, 16, 4, mood.markerColor, 0.24),
         this.scene.add.rectangle(-7, 22, 6, 10, mood.floorLineColor, 0.9),
         this.scene.add.rectangle(7, 22, 6, 10, mood.floorLineColor, 0.9),
         this.scene.add.rectangle(0, 9, 10, 4, mood.markerColor, 0.32)
@@ -416,7 +439,8 @@ export class RunnerLoopSystem {
       primary.push(
         this.scene.add.ellipse(-4, 8, 30, 16, mood.shadowColor, 0.94),
         this.scene.add.ellipse(12, -1, 18, 14, mood.shadowColor, 0.94),
-        this.scene.add.ellipse(21, 2, 10, 8, mood.shadowColor, 0.94)
+        this.scene.add.ellipse(21, 2, 10, 8, mood.shadowColor, 0.94),
+        this.scene.add.ellipse(3, 1, 10, 8, mood.shadowColor, 0.94)
       );
       secondary.push(
         this.scene.add.triangle(7, -12, -3, 0, 3, -10, 8, 4, mood.floorLineColor, 0.92),
@@ -424,7 +448,8 @@ export class RunnerLoopSystem {
         this.scene.add.triangle(-20, 2, -10, 0, -20, -8, -18, 9, mood.floorLineColor, 0.86),
         this.scene.add.rectangle(-14, 17, 6, 8, mood.floorLineColor, 0.9),
         this.scene.add.rectangle(0, 18, 6, 8, mood.floorLineColor, 0.9),
-        this.scene.add.ellipse(20, 1, 4, 4, mood.markerColor, 0.78)
+        this.scene.add.ellipse(20, 1, 4, 4, mood.markerColor, 0.78),
+        this.scene.add.rectangle(14, 7, 7, 2, mood.markerColor, 0.42).setRotation(0.1)
       );
     }
 
@@ -624,9 +649,24 @@ export class RunnerLoopSystem {
 
   private paintHazard(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const sway = Math.sin(time * 0.0032 + entity.worldX * 0.01) * 0.035;
-    const primaryFill = entity.variant === 'sludge' ? 0x6c4325 : mood.shadowColor;
-    const primaryStroke = entity.variant === 'sludge' ? 0x9d6a42 : mood.floorLineColor;
-    const secondaryFill = entity.variant === 'sludge' ? 0xa97347 : mood.floorLineColor;
+    const primaryFill =
+      entity.variant === 'sludge'
+        ? 0x6c4325
+        : entity.variant === 'warden'
+          ? 0x2d2b3a
+          : 0x4a4031;
+    const primaryStroke =
+      entity.variant === 'sludge'
+        ? 0x9d6a42
+        : entity.variant === 'warden'
+          ? 0x7a7f93
+          : 0x887760;
+    const secondaryFill =
+      entity.variant === 'sludge'
+        ? 0xa97347
+        : entity.variant === 'warden'
+          ? 0x8e9aa4
+          : 0x9e8d74;
     const secondaryStroke = entity.variant === 'sludge' ? 0xf8f1e5 : mood.markerColor;
 
     entity.container.setRotation(sway);

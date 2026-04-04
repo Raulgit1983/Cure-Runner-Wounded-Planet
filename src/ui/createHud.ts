@@ -58,7 +58,9 @@ export const createHud = (root: HTMLElement) => {
       `${detail.grounded ? 'grounded' : 'air'}`;
   };
 
-  window.addEventListener('mateo:runner-debug', handleRuntimeDebug as EventListener);
+  if (showTelemetry) {
+    window.addEventListener('mateo:runner-debug', handleRuntimeDebug as EventListener);
+  }
 
   const update = (state: SessionSnapshot) => {
     if (!progress || !meter || !hint || !count) {
@@ -105,7 +107,9 @@ export const createHud = (root: HTMLElement) => {
       if (telemetryInterval) {
         window.clearInterval(telemetryInterval);
       }
-      window.removeEventListener('mateo:runner-debug', handleRuntimeDebug as EventListener);
+      if (showTelemetry) {
+        window.removeEventListener('mateo:runner-debug', handleRuntimeDebug as EventListener);
+      }
     }
   };
 };

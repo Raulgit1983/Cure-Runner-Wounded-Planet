@@ -4,6 +4,7 @@ import { journeyConfig } from '@/game/content/journeyConfig';
 import { BootScene } from '@/game/scenes/BootScene';
 
 export const createGameConfig = (parent: string): Phaser.Types.Core.GameConfig => ({
+  banner: false,
   type: Phaser.AUTO,
   parent,
   width: journeyConfig.logicalSize.width,

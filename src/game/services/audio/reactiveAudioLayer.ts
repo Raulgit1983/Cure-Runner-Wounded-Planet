@@ -153,6 +153,33 @@ class ReactiveAudioLayer {
         volume: 0.022,
         type: 'triangle'
       });
+      return;
+    }
+
+    if (event.type === 'victory_win') {
+      this.playTone(context, master, {
+        from: 392,
+        to: 523,
+        duration: 0.18,
+        volume: 0.03,
+        type: 'sine'
+      });
+      this.playTone(context, master, {
+        from: 523,
+        to: 659,
+        duration: 0.22,
+        delay: 0.08,
+        volume: 0.028,
+        type: 'triangle'
+      });
+      this.playTone(context, master, {
+        from: 659,
+        to: 784,
+        duration: 0.28,
+        delay: 0.16,
+        volume: 0.024,
+        type: 'sine'
+      });
     }
   }
 
