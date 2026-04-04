@@ -6,11 +6,13 @@ export interface PersistentProgress {
 }
 
 export interface SessionSnapshot extends PersistentProgress {
+  noteProgress: number;
   currentPulse: number;
   displayLevel: number;
   tier: EmotionTier;
   currentChain: number;
   bestChain: number;
+  recoveryChances: number;
 }
 
 export interface SessionTransition {
@@ -21,9 +23,12 @@ export interface SessionTransition {
 type SessionListener = (snapshot: SessionSnapshot) => void;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const baseRecoveryChances = 0;
+const basePulse = 1;
+const reservePulseRestore = 0.36;
 
 const deriveDisplayLevel = (awakeningLevel: number, currentPulse: number) =>
-  clamp01(awakeningLevel * 0.78 + currentPulse * 0.22);
+  clamp01(awakeningLevel * 0.94 + currentPulse * 0.06);
 
 const deriveTier = (displayLevel: number): EmotionTier => {
   if (displayLevel >= 0.72) {
@@ -38,12 +43,18 @@ const deriveTier = (displayLevel: number): EmotionTier => {
 };
 
 const createSnapshot = (
-  state: PersistentProgress & { currentPulse: number; currentChain: number; bestChain: number }
+  state: PersistentProgress & {
+    currentPulse: number;
+    currentChain: number;
+    bestChain: number;
+    recoveryChances: number;
+  }
 ): SessionSnapshot => {
   const displayLevel = deriveDisplayLevel(state.awakeningLevel, state.currentPulse);
 
   return {
     ...state,
+    noteProgress: state.collectedSparks % 100,
     displayLevel,
     tier: deriveTier(displayLevel)
   };
@@ -56,13 +67,18 @@ export const emotionTierLabel: Record<EmotionTier, string> = {
 };
 
 class SessionStateStore {
-  private state: PersistentProgress & { currentPulse: number; currentChain: number; bestChain: number } =
-    {
+  private state: PersistentProgress & {
+    currentPulse: number;
+    currentChain: number;
+    bestChain: number;
+    recoveryChances: number;
+  } = {
     awakeningLevel: 0,
-    currentPulse: 0.08,
+    currentPulse: basePulse,
     collectedSparks: 0,
     currentChain: 0,
-    bestChain: 0
+    bestChain: 0,
+    recoveryChances: baseRecoveryChances
   };
 
   private listeners = new Set<SessionListener>();
@@ -71,9 +87,10 @@ class SessionStateStore {
     this.state = {
       awakeningLevel: clamp01(progress.awakeningLevel ?? 0),
       collectedSparks: Math.max(0, Math.floor(progress.collectedSparks ?? 0)),
-      currentPulse: 0.08,
+      currentPulse: basePulse,
       currentChain: 0,
-      bestChain: 0
+      bestChain: 0,
+      recoveryChances: baseRecoveryChances
     };
 
     this.emit();
@@ -83,9 +100,10 @@ class SessionStateStore {
     this.state = {
       awakeningLevel: this.state.awakeningLevel,
       collectedSparks: this.state.collectedSparks,
-      currentPulse: 0.08,
+      currentPulse: basePulse,
       currentChain: 0,
-      bestChain: 0
+      bestChain: 0,
+      recoveryChances: baseRecoveryChances
     };
 
     this.emit();
@@ -112,33 +130,26 @@ class SessionStateStore {
   }
 
   coolDown(deltaSeconds: number) {
-    const floor = Math.min(0.26, 0.06 + this.state.awakeningLevel * 0.08);
-    const nextPulse =
-      this.state.currentPulse >= floor
-        ? Math.max(floor, this.state.currentPulse - deltaSeconds * 0.085)
-        : Math.min(floor, this.state.currentPulse + deltaSeconds * 0.05);
-
-    this.applyState({
-      ...this.state,
-      currentPulse: nextPulse
-    });
+    void deltaSeconds;
   }
 
   registerSparkCollection({
     awakeningGain,
-    pulseGain,
     chain
   }: {
     awakeningGain: number;
-    pulseGain: number;
     chain: number;
   }): SessionTransition {
+    const collectedSparks = this.state.collectedSparks + 1;
+    const reserveGain = collectedSparks % 100 === 0 ? 1 : 0;
+
     return this.applyState({
+      ...this.state,
       awakeningLevel: clamp01(this.state.awakeningLevel + awakeningGain),
-      currentPulse: clamp01(this.state.currentPulse + pulseGain),
-      collectedSparks: this.state.collectedSparks + 1,
+      collectedSparks,
       currentChain: Math.max(1, Math.floor(chain)),
-      bestChain: Math.max(this.state.bestChain, Math.max(1, Math.floor(chain)))
+      bestChain: Math.max(this.state.bestChain, Math.max(1, Math.floor(chain))),
+      recoveryChances: this.state.recoveryChances + reserveGain
     });
   }
 
@@ -156,15 +167,24 @@ class SessionStateStore {
     pulseLoss: number;
     nextChain?: number;
   }): SessionTransition {
+    const nextPulse = clamp01(this.state.currentPulse - pulseLoss);
+    const reserveUsed = nextPulse <= 0.001 && this.state.recoveryChances > 0;
+
     return this.applyState({
       ...this.state,
-      currentPulse: clamp01(this.state.currentPulse - pulseLoss),
-      currentChain: Math.max(0, Math.floor(nextChain))
+      currentPulse: reserveUsed ? reservePulseRestore : nextPulse,
+      currentChain: Math.max(0, Math.floor(nextChain)),
+      recoveryChances: Math.max(0, this.state.recoveryChances - (reserveUsed ? 1 : 0))
     });
   }
 
   private applyState(
-    nextState: PersistentProgress & { currentPulse: number; currentChain: number; bestChain: number }
+    nextState: PersistentProgress & {
+      currentPulse: number;
+      currentChain: number;
+      bestChain: number;
+      recoveryChances: number;
+    }
   ): SessionTransition {
     const previous = this.snapshot();
     this.state = nextState;
@@ -176,7 +196,8 @@ class SessionStateStore {
       Math.abs(previous.currentPulse - next.currentPulse) > 0.004 ||
       previous.tier !== next.tier ||
       previous.currentChain !== next.currentChain ||
-      previous.bestChain !== next.bestChain;
+      previous.bestChain !== next.bestChain ||
+      previous.recoveryChances !== next.recoveryChances;
 
     if (changed) {
       this.emit();

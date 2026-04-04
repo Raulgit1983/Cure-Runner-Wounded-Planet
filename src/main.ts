@@ -17,7 +17,7 @@ if (!app) {
 
 app.innerHTML = `
   <div class="app-shell">
-    <section class="game-frame" aria-label="Mateo spark journey play area">
+    <section class="game-frame" aria-label="Cure Runner: Wounded Earth play area">
       <header class="hud" id="hud"></header>
       <div class="game-root" id="game-root"></div>
       <div class="entry-shell" id="entry-shell" data-state="idle" data-stage="0">

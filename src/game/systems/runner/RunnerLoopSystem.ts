@@ -417,45 +417,50 @@ export class RunnerLoopSystem {
 
     if (variant === 'spark') {
       primary.push(
-        this.scene.add.ellipse(0, 3, 18, 16, mood.sparkColor, 1),
-        this.scene.add.triangle(-10, -6, -8, 2, 0, -10, 2, 4, mood.sparkColor, 1).setRotation(-0.26),
-        this.scene.add.triangle(10, -6, -2, 4, 0, -10, 8, 2, mood.sparkColor, 1).setRotation(0.26),
-        this.scene.add.ellipse(0, 10, 24, 10, mood.sparkColor, 1),
-        this.scene.add.triangle(0, 17, -4, -2, 0, 4, 4, -2, mood.sparkColor, 1)
+        this.scene.add.ellipse(-8, 9, 12, 16, mood.sparkColor, 1).setRotation(-0.58),
+        this.scene.add.ellipse(8, 13, 12, 16, mood.sparkColor, 1).setRotation(-0.58),
+        this.scene.add.rectangle(-1, -4, 4, 30, mood.sparkColor, 1).setRotation(-0.08),
+        this.scene.add.rectangle(14, 1, 4, 30, mood.sparkColor, 1).setRotation(-0.05),
+        this.scene.add.rectangle(7, -18, 24, 5, mood.sparkColor, 1).setRotation(0.14),
+        this.scene.add.triangle(-16, 18, -6, 3, 0, -10, 5, 4, mood.sparkColor, 1).setRotation(-0.42)
       );
       secondary.push(
-        this.scene.add.ellipse(0, 3, 8, 8, 0xffffff, 1),
-        this.scene.add.ellipse(0, -5, 4, 4, 0xffffff, 1),
-        this.scene.add.ellipse(0, 11, 5, 3, 0xf8fff0, 0.9)
+        this.scene.add.ellipse(-8, 9, 6, 8, 0xffffff, 1).setRotation(-0.58),
+        this.scene.add.ellipse(8, 13, 6, 8, 0xffffff, 1).setRotation(-0.58),
+        this.scene.add.rectangle(8, -19, 10, 2, 0xffffff, 1).setRotation(0.14),
+        this.scene.add.ellipse(13, -24, 4, 4, 0xffffff, 1)
       );
     }
 
     if (variant === 'note') {
       primary.push(
-        this.scene.add.ellipse(0, 2, 18, 24, mood.sparkColor, 1),
-        this.scene.add.rectangle(0, 12, 14, 8, mood.sparkColor, 1),
-        this.scene.add.triangle(0, -14, -7, 3, 0, -8, 7, 3, mood.sparkColor, 1),
-        this.scene.add.triangle(-9, -2, -4, 5, 0, -6, 3, 6, mood.sparkColor, 1).setRotation(-0.22),
-        this.scene.add.triangle(9, -2, -3, 6, 0, -6, 4, 5, mood.sparkColor, 1).setRotation(0.22)
+        this.scene.add.ellipse(-5, 10, 14, 18, mood.sparkColor, 1).setRotation(-0.54),
+        this.scene.add.rectangle(9, -5, 4, 36, mood.sparkColor, 1).setRotation(-0.04),
+        this.scene.add.rectangle(15, -24, 12, 5, mood.sparkColor, 1).setRotation(0.18),
+        this.scene.add.triangle(17, -16, -8, 6, 0, -12, 7, 0, mood.sparkColor, 1).setRotation(0.22),
+        this.scene.add.ellipse(1, 22, 11, 5, mood.sparkColor, 1).setRotation(0.12)
       );
       secondary.push(
-        this.scene.add.ellipse(0, 2, 8, 10, 0xffffff, 1),
-        this.scene.add.ellipse(2, 1, 3, 3, 0xffffff, 1),
-        this.scene.add.rectangle(0, 13, 6, 2, 0xf8fff0, 0.9)
+        this.scene.add.ellipse(-5, 10, 7, 9, 0xffffff, 1).setRotation(-0.54),
+        this.scene.add.rectangle(15, -24, 6, 2, 0xffffff, 1).setRotation(0.18),
+        this.scene.add.ellipse(19, -30, 3, 3, 0xffffff, 1)
       );
     }
 
     if (variant === 'brush') {
       primary.push(
-        this.scene.add.ellipse(-6, 6, 16, 12, mood.sparkColor, 1),
-        this.scene.add.rectangle(6, -2, 20, 6, mood.sparkColor, 1).setRotation(-0.56),
-        this.scene.add.triangle(15, -13, -6, 4, 6, 0, 0, -9, mood.sparkColor, 1).setRotation(-0.18),
-        this.scene.add.triangle(-14, 13, -5, -2, 5, -1, 0, 6, mood.sparkColor, 1).setRotation(0.2)
+        this.scene.add.ellipse(-6, 12, 13, 17, mood.sparkColor, 1).setRotation(-0.52),
+        this.scene.add.ellipse(8, 16, 13, 17, mood.sparkColor, 1).setRotation(-0.52),
+        this.scene.add.rectangle(11, -3, 4, 34, mood.sparkColor, 1).setRotation(-0.04),
+        this.scene.add.rectangle(16, -21, 16, 5, mood.sparkColor, 1).setRotation(0.22),
+        this.scene.add.triangle(19, -13, -8, 6, 0, -11, 7, 0, mood.sparkColor, 1).setRotation(0.18),
+        this.scene.add.triangle(-16, 20, -6, 2, 0, -9, 4, 4, mood.sparkColor, 1).setRotation(-0.34)
       );
       secondary.push(
-        this.scene.add.ellipse(-6, 6, 6, 6, 0xffffff, 1),
-        this.scene.add.rectangle(8, -4, 8, 2, 0xffffff, 1).setRotation(-0.56),
-        this.scene.add.rectangle(-11, 11, 6, 2, 0xf8fff0, 0.9).setRotation(0.2)
+        this.scene.add.ellipse(-6, 12, 6, 8, 0xffffff, 1).setRotation(-0.52),
+        this.scene.add.ellipse(8, 16, 6, 8, 0xffffff, 1).setRotation(-0.52),
+        this.scene.add.rectangle(16, -21, 8, 2, 0xffffff, 1).setRotation(0.22),
+        this.scene.add.ellipse(22, -28, 3, 3, 0xffffff, 1)
       );
     }
 
@@ -494,56 +499,54 @@ export class RunnerLoopSystem {
 
     if (variant === 'sludge') {
       primary.push(
-        this.scene.add.rectangle(0, 12, 36, 14, 0x3e4c59, 1),
-        this.scene.add.triangle(-6, -2, -12, 14, 12, 14, -6, -8, 0x52606d, 1),
-        this.scene.add.rectangle(8, 2, 16, 12, 0x52606d, 1).setRotation(0.2),
-        this.scene.add.rectangle(-12, 4, 14, 18, 0x616e7c, 1).setRotation(-0.15),
-        this.scene.add.triangle(15, 4, -4, 9, 4, 0, 0, -8, 0x607284, 1).setRotation(0.14)
+        this.scene.add.ellipse(0, 16, 38, 10, 0x141820, 0.4),
+        this.scene.add.ellipse(-2, 10, 34, 16, 0x29323b, 1),
+        this.scene.add.triangle(-15, 6, -8, 10, 0, -12, 10, 10, 0x3c444d, 1).setRotation(-0.18),
+        this.scene.add.triangle(1, 2, -8, 12, 0, -13, 8, 12, 0x48505a, 1),
+        this.scene.add.triangle(17, 6, -10, 10, 0, -9, 8, 12, 0x343c45, 1).setRotation(0.2),
+        this.scene.add.rectangle(-1, 8, 17, 7, 0x59616c, 1).setRotation(-0.08)
       );
       secondary.push(
-        this.scene.add.rectangle(-6, 0, 4, 12, 0x9aa5b1, 1).setRotation(0.4),
-        this.scene.add.rectangle(8, -4, 18, 4, 0x7b8794, 1).setRotation(-0.3),
-        this.scene.add.ellipse(-16, 14, 6, 4, 0x323f4b, 1),
-        this.scene.add.ellipse(14, 16, 12, 4, 0x1f2933, 1),
-        this.scene.add.rectangle(10, 6, 7, 2, 0xd5dde2, 0.85).setRotation(-0.22)
+        this.scene.add.ellipse(-11, 11, 8, 4, 0xb1c57d, 1).setRotation(-0.12),
+        this.scene.add.ellipse(8, 6, 10, 4, 0xc7e39a, 1).setRotation(0.22),
+        this.scene.add.rectangle(15, 10, 8, 2, 0xe8f6c3, 0.9).setRotation(-0.12),
+        this.scene.add.rectangle(-4, 2, 8, 2, 0xcbd6c9, 0.6).setRotation(-0.52)
       );
     }
 
     if (variant === 'warden') {
       primary.push(
-        this.scene.add.ellipse(0, 20, 40, 8, 0x13111a, 0.4),
-        this.scene.add.rectangle(0, 8, 34, 12, 0x3a2a2a, 1).setRotation(0.04),
-        this.scene.add.rectangle(-2, -4, 30, 14, 0x2a303a, 1).setRotation(-0.06),
-        this.scene.add.rectangle(3, -18, 28, 16, 0x4a2a2a, 1).setRotation(0.08),
-        this.scene.add.triangle(0, -32, -12, 6, 12, 6, 0, -8, 0x1a1a2a, 1),
-        this.scene.add.rectangle(-16, 4, 6, 14, 0x33262f, 1).setRotation(-0.1),
-        this.scene.add.rectangle(16, 6, 6, 14, 0x33262f, 1).setRotation(0.1)
+        this.scene.add.ellipse(0, 20, 40, 8, 0x0d0d12, 0.44),
+        this.scene.add.triangle(-12, -2, -8, 18, 0, -12, 10, 16, 0x35272f, 1).setRotation(-0.16),
+        this.scene.add.triangle(12, -2, -10, 16, 0, -12, 8, 18, 0x3d2b34, 1).setRotation(0.16),
+        this.scene.add.rectangle(0, 7, 28, 16, 0x251f27, 1).setRotation(0.05),
+        this.scene.add.rectangle(0, -9, 22, 18, 0x3d2d33, 1).setRotation(-0.04),
+        this.scene.add.triangle(0, -25, -10, 6, 0, -10, 10, 6, 0x1a1820, 1),
+        this.scene.add.rectangle(0, -1, 6, 34, 0x1d1a22, 1)
       );
       secondary.push(
-        this.scene.add.rectangle(0, 8, 30, 4, 0xfff0e4, 0.9).setRotation(0.04),
-        this.scene.add.rectangle(-2, -4, 26, 4, 0xe4f0ff, 0.9).setRotation(-0.06),
-        this.scene.add.rectangle(3, -18, 24, 6, 0xffe4e4, 0.9).setRotation(0.08),
-        this.scene.add.ellipse(0, -28, 6, 6, 0xff3333, 0.8),
-        this.scene.add.rectangle(0, 18, 12, 2, 0xe7dfe4, 0.72)
+        this.scene.add.ellipse(0, -11, 8, 8, 0xff7b72, 0.94),
+        this.scene.add.rectangle(-8, 4, 7, 2, 0xb6b1bc, 0.72).setRotation(-0.32),
+        this.scene.add.rectangle(7, 1, 8, 2, 0xc5c0c8, 0.72).setRotation(0.22),
+        this.scene.add.rectangle(0, 16, 14, 2, 0xdad4cc, 0.52)
       );
     }
 
     if (variant === 'hound') {
       primary.push(
-        this.scene.add.ellipse(-2, 18, 38, 8, 0x13111a, 0.4),
-        this.scene.add.rectangle(0, 6, 28, 16, 0x34495e, 1),
-        this.scene.add.triangle(18, -4, -10, 10, 6, 10, 8, -6, 0x2c3e50, 1),
-        this.scene.add.rectangle(-12, 14, 6, 14, 0x2c3e50, 1).setRotation(0.2),
-        this.scene.add.rectangle(8, 14, 6, 14, 0x2c3e50, 1).setRotation(-0.1),
-        this.scene.add.triangle(-2, -8, -5, 5, 0, -8, 5, 5, 0x25394e, 1)
+        this.scene.add.ellipse(-1, 18, 38, 8, 0x0b0d12, 0.44),
+        this.scene.add.ellipse(-4, 8, 24, 14, 0x24303a, 1),
+        this.scene.add.triangle(14, 3, -12, 8, 0, -12, 11, 12, 0x303c47, 1).setRotation(0.06),
+        this.scene.add.triangle(-15, 3, -10, 10, 0, -10, 8, 12, 0x182127, 1).setRotation(-0.22),
+        this.scene.add.rectangle(-9, 17, 5, 12, 0x1b242d, 1).setRotation(0.18),
+        this.scene.add.rectangle(6, 17, 5, 12, 0x1b242d, 1).setRotation(-0.12),
+        this.scene.add.triangle(-1, -4, -5, 7, 0, -10, 5, 7, 0x42505c, 1)
       );
       secondary.push(
-        this.scene.add.rectangle(4, 2, 24, 2, 0x7f8c8d, 1),
-        this.scene.add.ellipse(20, -2, 6, 6, 0xff3366, 0.9),
-        this.scene.add.triangle(-14, 0, -6, 8, 6, 8, -6, -4, 0x95a5a6, 1),
-        this.scene.add.rectangle(-12, 20, 8, 4, 0x1a252f, 1),
-        this.scene.add.rectangle(8, 20, 8, 4, 0x1a252f, 1),
-        this.scene.add.rectangle(8, -5, 8, 2, 0xd7e0e8, 0.74).setRotation(0.1)
+        this.scene.add.rectangle(5, 4, 16, 2, 0x94a5aa, 0.82).setRotation(0.08),
+        this.scene.add.ellipse(17, -1, 6, 6, 0xff7b72, 0.94),
+        this.scene.add.triangle(-14, 2, -5, 8, 5, 8, -6, -3, 0xc9d0cf, 0.78),
+        this.scene.add.rectangle(10, 11, 8, 2, 0xece0d6, 0.72).setRotation(-0.12)
       );
     }
 
@@ -634,15 +637,12 @@ export class RunnerLoopSystem {
     const previous = sessionState.snapshot();
     const nextChain = previous.currentChain + 1;
     const comboTier = Math.floor((nextChain - 1) / runnerConfig.rewards.comboEvery);
-    const pulseGain =
-      runnerConfig.rewards.basePulseGain + comboTier * runnerConfig.rewards.comboPulseBonus;
     const awakeningGain =
       runnerConfig.rewards.baseAwakeningGain +
       comboTier * runnerConfig.rewards.comboAwakeningBonus;
 
     const transition = sessionState.registerSparkCollection({
       awakeningGain,
-      pulseGain,
       chain: nextChain
     });
 
@@ -654,7 +654,7 @@ export class RunnerLoopSystem {
       type: 'spark_collect',
       intensity: 1 + comboTier * 0.16,
       chain: nextChain,
-      amount: pulseGain
+      amount: 1
     });
 
     if (nextChain >= runnerConfig.rewards.comboEvery) {
@@ -681,18 +681,19 @@ export class RunnerLoopSystem {
     }
 
     const previous = sessionState.snapshot();
-
-    sessionState.registerPulseDrop({
+    const transition = sessionState.registerPulseDrop({
       pulseLoss: runnerConfig.obstacle.pulseLoss,
       nextChain: 0
     });
+    const shouldFail = transition.after.currentPulse <= 0.001;
 
     this.impactBurst = 1;
-    this.collectBurst = Math.max(0, this.collectBurst - 0.24);
-    this.chainBurst = Math.max(0, this.chainBurst - 0.28);
+    this.collectBurst = Math.max(0, this.collectBurst - (shouldFail ? 0.24 : 0.18));
+    this.chainBurst = Math.max(0, this.chainBurst - (shouldFail ? 0.28 : 0.18));
     this.staggerSeconds = runnerConfig.obstacle.staggerSeconds;
     this.invulnerabilitySeconds = runnerConfig.obstacle.invulnerabilitySeconds;
-    this.failed = true;
+    this.recoveryQueued = !shouldFail;
+    this.failed = shouldFail;
     runTelemetryStore.noteObstacleHit();
 
     audioCueBus.emit({
@@ -702,12 +703,11 @@ export class RunnerLoopSystem {
       amount: runnerConfig.obstacle.pulseLoss
     });
 
-    if (previous.currentChain > 0) {
-      sessionState.breakChain();
+    if (shouldFail) {
+      this.setFrozen(true);
     }
 
-    this.setFrozen(true);
-    entity.container.setRotation(Phaser.Math.DegToRad(6));
+    entity.container.setRotation(Phaser.Math.DegToRad(shouldFail ? 10 : 6));
   }
 
   private getHeroBounds() {
@@ -737,10 +737,11 @@ export class RunnerLoopSystem {
 
   private paintCollectible(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const hoverScale = 1 + Math.sin(time * 0.005 + entity.worldX * 0.018) * 0.06;
-    const shellColor = 0xe9ead9;
-    const shellStroke = 0x657267;
-    const accentColor = 0xd4e7d0;
-    const highlightColor = 0xfaf7ed;
+    const shellColor = 0xf0e7d7;
+    const shellWarm = 0xe2d3b3;
+    const shellStroke = 0x645d4f;
+    const mossAccent = 0xc7d8ab;
+    const highlightColor = 0xfff8ea;
     const applyPaint = (
       shape: PaintableShape | undefined,
       fillColor: number,
@@ -751,54 +752,46 @@ export class RunnerLoopSystem {
       shape?.setFillStyle(fillColor, fillAlpha).setStrokeStyle(2, strokeColor, strokeAlpha);
     };
 
-    entity.container.setScale((hoverScale + this.chainBurst * 0.032) * 1.14);
-    entity.halo?.setFillStyle(mood.sparkColor, mood.sparkHaloAlpha * 0.5 + this.chainBurst * 0.035);
+    entity.container.setScale((hoverScale + this.chainBurst * 0.032) * 1.08);
+    entity.halo?.setFillStyle(mood.sparkColor, mood.sparkHaloAlpha * 0.42 + this.chainBurst * 0.028);
 
     if (entity.variant === 'spark') {
-      entity.primary.forEach((shape, index) => {
-        applyPaint(
-          shape,
-          index === 3 ? accentColor : shellColor,
-          0.96,
-          shellStroke,
-          index === 4 ? 0.18 : 0.24
-        );
-      });
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.94, mood.sparkEdgeColor, 0.22);
-      applyPaint(entity.secondary[1], highlightColor, 0.9, shellStroke, 0.06);
-      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      applyPaint(entity.primary[0], shellWarm, 0.98, shellStroke, 0.26);
+      applyPaint(entity.primary[1], shellWarm, 0.98, shellStroke, 0.26);
+      applyPaint(entity.primary[2], shellColor, 0.98, shellStroke, 0.24);
+      applyPaint(entity.primary[3], shellColor, 0.98, shellStroke, 0.24);
+      applyPaint(entity.primary[4], mossAccent, 0.94, shellStroke, 0.18);
+      applyPaint(entity.primary[5], shellColor, 0.96, shellStroke, 0.2);
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[2], highlightColor, 0.92, shellStroke, 0.08);
+      applyPaint(entity.secondary[3], highlightColor, 0.78, shellStroke, 0.04);
       return;
     }
 
     if (entity.variant === 'note') {
-      entity.primary.forEach((shape, index) => {
-        applyPaint(
-          shape,
-          index === 1 ? accentColor : shellColor,
-          0.96,
-          shellStroke,
-          index > 2 ? 0.18 : 0.24
-        );
-      });
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.9, mood.sparkEdgeColor, 0.22);
-      applyPaint(entity.secondary[1], highlightColor, 0.92, shellStroke, 0.05);
-      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      applyPaint(entity.primary[0], shellWarm, 0.98, shellStroke, 0.26);
+      applyPaint(entity.primary[1], shellColor, 0.98, shellStroke, 0.24);
+      applyPaint(entity.primary[2], mossAccent, 0.94, shellStroke, 0.16);
+      applyPaint(entity.primary[3], shellColor, 0.96, shellStroke, 0.18);
+      applyPaint(entity.primary[4], shellWarm, 0.92, shellStroke, 0.12);
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], highlightColor, 0.92, shellStroke, 0.08);
+      applyPaint(entity.secondary[2], highlightColor, 0.76, shellStroke, 0.04);
       return;
     }
 
     if (entity.variant === 'brush') {
-      entity.primary.forEach((shape, index) => {
-        applyPaint(
-          shape,
-          index === 1 ? accentColor : shellColor,
-          0.96,
-          shellStroke,
-          index === 3 ? 0.16 : 0.24
-        );
-      });
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.92, mood.sparkEdgeColor, 0.2);
-      applyPaint(entity.secondary[1], highlightColor, 0.9, shellStroke, 0.05);
-      applyPaint(entity.secondary[2], accentColor, 0.82, shellStroke, 0.08);
+      applyPaint(entity.primary[0], shellWarm, 0.98, shellStroke, 0.26);
+      applyPaint(entity.primary[1], shellWarm, 0.98, shellStroke, 0.26);
+      applyPaint(entity.primary[2], shellColor, 0.98, shellStroke, 0.24);
+      applyPaint(entity.primary[3], mossAccent, 0.94, shellStroke, 0.16);
+      applyPaint(entity.primary[4], shellColor, 0.96, shellStroke, 0.18);
+      applyPaint(entity.primary[5], shellWarm, 0.92, shellStroke, 0.16);
+      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[2], highlightColor, 0.92, shellStroke, 0.08);
+      applyPaint(entity.secondary[3], highlightColor, 0.76, shellStroke, 0.04);
       return;
     }
 
@@ -808,19 +801,66 @@ export class RunnerLoopSystem {
 
   private paintHazard(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const sway = Math.sin(time * 0.0032 + entity.worldX * 0.01) * 0.035;
+    const inactiveAlpha = entity.inactive ? 0.52 : 1;
+    const applyPaint = (
+      shape: PaintableShape | undefined,
+      fillColor: number,
+      fillAlpha: number,
+      strokeColor: number,
+      strokeAlpha: number,
+      strokeWidth = 2
+    ) => {
+      shape
+        ?.setAlpha(inactiveAlpha)
+        .setFillStyle(fillColor, fillAlpha)
+        .setStrokeStyle(strokeWidth, strokeColor, strokeAlpha);
+    };
+
     entity.container.setRotation(sway);
 
-    const primaryStroke =
-      entity.variant === 'sludge' ? 0x2c3e50 : entity.variant === 'warden' ? 0x2a1a1a : 0x1a252f;
-    const secondaryStroke = entity.variant === 'sludge' ? 0x7b8794 : mood.markerColor;
+    if (entity.variant === 'sludge') {
+      entity.container.setScale(1 + Math.abs(sway) * 0.7, 1 - Math.abs(sway) * 0.08);
+      applyPaint(entity.primary[0], 0x0d1116, 0.4, 0x06080b, 0.2, 1);
+      applyPaint(entity.primary[1], 0x252d35, 0.98, 0x0b1015, 0.64, 3);
+      applyPaint(entity.primary[2], 0x3a4149, 0.98, 0x121920, 0.62, 3);
+      applyPaint(entity.primary[3], 0x495058, 0.98, 0x151c22, 0.62, 3);
+      applyPaint(entity.primary[4], 0x31383f, 0.98, 0x11171d, 0.62, 3);
+      applyPaint(entity.primary[5], 0x59626a, 0.98, 0x1c242b, 0.52, 2);
+      applyPaint(entity.secondary[0], 0xaebf73, 0.68, 0x30411d, 0.28, 2);
+      applyPaint(entity.secondary[1], 0xc7dfa2, 0.72, 0x344a20, 0.3, 2);
+      applyPaint(entity.secondary[2], 0xf4f8da, 0.74, 0x5c6749, 0.14, 1);
+      applyPaint(entity.secondary[3], 0xd7ddd6, 0.38, 0x5b635c, 0.12, 1);
+      return;
+    }
 
-    entity.primary.forEach((shape) => {
-      shape.setAlpha(entity.inactive ? 0.46 : 0.92).setStrokeStyle(3, primaryStroke, 0.6);
-    });
-    
-    entity.secondary.forEach((shape) => {
-      shape.setAlpha(entity.inactive ? 0.34 : 0.86).setStrokeStyle(2, secondaryStroke, entity.variant === 'sludge' ? 0.3 : 0.2);
-    });
+    if (entity.variant === 'warden') {
+      entity.container.setScale(1 + Math.abs(sway) * 0.16, 1);
+      applyPaint(entity.primary[0], 0x090a0d, 0.4, 0x040507, 0.2, 1);
+      applyPaint(entity.primary[1], 0x33242c, 0.98, 0x110d12, 0.62, 3);
+      applyPaint(entity.primary[2], 0x3a2930, 0.98, 0x140d12, 0.62, 3);
+      applyPaint(entity.primary[3], 0x231d25, 0.98, 0x0d0a0f, 0.64, 3);
+      applyPaint(entity.primary[4], 0x3d2b31, 0.98, 0x140e12, 0.62, 3);
+      applyPaint(entity.primary[5], 0x18151b, 0.98, 0x0a090d, 0.5, 2);
+      applyPaint(entity.primary[6], 0x1b1820, 0.98, 0x08070a, 0.54, 2);
+      applyPaint(entity.secondary[0], 0xff8478, 0.9, 0x6d201b, 0.24, 2);
+      applyPaint(entity.secondary[1], 0xc7c1c8, 0.68, 0x524d53, 0.12, 1);
+      applyPaint(entity.secondary[2], 0xd6d0d8, 0.68, 0x524d53, 0.12, 1);
+      applyPaint(entity.secondary[3], 0xe8ded2, 0.42, 0x64594e, 0.1, 1);
+      return;
+    }
+
+    entity.container.setScale(1 + Math.abs(sway) * 0.28, 1 - Math.abs(sway) * 0.04);
+    applyPaint(entity.primary[0], 0x080a0d, 0.4, 0x040507, 0.2, 1);
+    applyPaint(entity.primary[1], 0x23303a, 0.98, 0x10161b, 0.62, 3);
+    applyPaint(entity.primary[2], 0x31404a, 0.98, 0x131a20, 0.62, 3);
+    applyPaint(entity.primary[3], 0x171f25, 0.98, 0x0a0d10, 0.62, 3);
+    applyPaint(entity.primary[4], 0x1a232b, 0.98, 0x0b0f13, 0.46, 2);
+    applyPaint(entity.primary[5], 0x1a232b, 0.98, 0x0b0f13, 0.46, 2);
+    applyPaint(entity.primary[6], 0x43515d, 0.98, 0x182028, 0.44, 2);
+    applyPaint(entity.secondary[0], 0xa1b0b4, 0.78, 0x536066, 0.12, 1);
+    applyPaint(entity.secondary[1], 0xff8478, 0.92, 0x70221e, 0.24, 2);
+    applyPaint(entity.secondary[2], 0xd6d4ce, 0.72, 0x655f57, 0.12, 1);
+    applyPaint(entity.secondary[3], 0xf0e7d8, 0.7, 0x655f57, 0.1, 1);
   }
 
   private paintShapes(

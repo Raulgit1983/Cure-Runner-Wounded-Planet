@@ -36,51 +36,46 @@ export const runnerPhrases: Record<RunnerPhraseId, RunnerPhrase> = {
     id: 'onboarding_arc',
     label: 'Onboarding Arc',
     family: 'onboarding',
-    spacingAfter: 388,
+    spacingAfter: 412,
     items: [
       { kind: 'collectible', variant: 'spark', x: 98, y: 52 },
       { kind: 'collectible', variant: 'note', x: 158, y: 98 },
       { kind: 'hazard', variant: 'sludge', x: 224, y: 18 },
-      { kind: 'collectible', variant: 'brush', x: 264, y: 106 },
-      { kind: 'collectible', variant: 'spark', x: 318, y: 68 }
+      { kind: 'collectible', variant: 'brush', x: 290, y: 106 }
     ]
   },
   tension_drill: {
     id: 'tension_drill',
     label: 'Tension Drill',
     family: 'tension',
-    spacingAfter: 458,
+    spacingAfter: 492,
     items: [
       { kind: 'hazard', variant: 'warden', x: 154, y: 24 },
-      { kind: 'collectible', variant: 'note', x: 196, y: 128 },
-      { kind: 'collectible', variant: 'brush', x: 250, y: 154 },
+      { kind: 'collectible', variant: 'note', x: 214, y: 128 },
       { kind: 'hazard', variant: 'hound', x: 366, y: 16 },
-      { kind: 'collectible', variant: 'spark', x: 414, y: 110 }
+      { kind: 'collectible', variant: 'spark', x: 438, y: 104 }
     ]
   },
   recovery_breath: {
     id: 'recovery_breath',
     label: 'Recovery Breath',
     family: 'recovery',
-    spacingAfter: 338,
+    spacingAfter: 362,
     items: [
       { kind: 'collectible', variant: 'spark', x: 84, y: 60 },
-      { kind: 'collectible', variant: 'note', x: 132, y: 84 },
-      { kind: 'collectible', variant: 'brush', x: 180, y: 72 },
-      { kind: 'collectible', variant: 'spark', x: 236, y: 54 }
+      { kind: 'collectible', variant: 'note', x: 154, y: 88 },
+      { kind: 'collectible', variant: 'brush', x: 230, y: 70 }
     ]
   },
   recovery_lift: {
     id: 'recovery_lift',
     label: 'Recovery Lift',
     family: 'recovery',
-    spacingAfter: 364,
+    spacingAfter: 388,
     items: [
       { kind: 'collectible', variant: 'spark', x: 88, y: 52 },
-      { kind: 'collectible', variant: 'note', x: 134, y: 84 },
-      { kind: 'collectible', variant: 'brush', x: 180, y: 124 },
-      { kind: 'collectible', variant: 'note', x: 228, y: 92 },
-      { kind: 'collectible', variant: 'spark', x: 278, y: 60 }
+      { kind: 'collectible', variant: 'note', x: 162, y: 86 },
+      { kind: 'collectible', variant: 'brush', x: 246, y: 116 }
     ]
   }
 };

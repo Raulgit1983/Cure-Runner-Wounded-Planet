@@ -465,12 +465,15 @@ body::before {
 }
 
 .hud__chain {
+  min-width: 74px;
   padding: 8px 11px;
   border-radius: 999px;
   font-size: 12px;
   line-height: 1;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   backdrop-filter: blur(8px);
   background: rgba(17, 19, 27, 0.42);

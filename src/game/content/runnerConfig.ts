@@ -35,14 +35,14 @@ export const runnerConfig = {
   rewards: {
     collectRadius: 40,
     missMargin: 52,
-    basePulseGain: 0.14,
-    baseAwakeningGain: 0.034,
+    basePulseGain: 0.095,
+    baseAwakeningGain: 0.026,
     comboEvery: 3,
-    comboPulseBonus: 0.022,
-    comboAwakeningBonus: 0.014
+    comboPulseBonus: 0.014,
+    comboAwakeningBonus: 0.01
   },
   obstacle: {
-    pulseLoss: 0.21,
+    pulseLoss: 0.34,
     staggerSeconds: 0.2,
     invulnerabilitySeconds: 0.82,
     speedPenalty: 0.22

@@ -1,7 +1,7 @@
 import { runTelemetryStore } from '@/game/services/telemetry/runTelemetryStore';
 import { sessionState, type SessionSnapshot } from '@/game/state/sessionState';
 
-const renderProgress = (state: SessionSnapshot) => `${Math.round(state.displayLevel * 100)}%`;
+const renderPulse = (state: SessionSnapshot) => `${Math.round(state.currentPulse * 100)}%`;
 
 export const createHud = (root: HTMLElement) => {
   const showTelemetry =
@@ -33,7 +33,7 @@ export const createHud = (root: HTMLElement) => {
           <div class="spark-meter__fill" data-role="meter"></div>
         </div>
       </div>
-      <div class="hud__chain" data-role="count">x0</div>
+      <div class="hud__chain" data-role="count">0/100</div>
     </div>
     <p class="hud__hint" data-role="hint">Toca para saltar. Toca otra vez en el aire.</p>
     ${showTelemetry ? '<p class="hud__telemetry" data-role="telemetry"></p>' : ''}
@@ -107,15 +107,23 @@ export const createHud = (root: HTMLElement) => {
     }
 
     hint.textContent =
-      state.currentChain >= 3
-        ? 'Los tramos limpios lo despiertan.'
-        : state.tier === 'awake'
-          ? 'El planeta empieza a abrirse.'
-        : state.collectedSparks > 0
-          ? 'Toca otra vez en el aire para el doble salto.'
-          : 'Toca para saltar. Toca otra vez en el aire.';
+      state.currentPulse <= 0.34
+        ? 'Busca aire. El tiburón puede ayudarte.'
+        : state.recoveryChances > 0
+          ? 'Llevas una reserva contigo.'
+          : state.noteProgress >= 75
+            ? 'Ya casi llenas una reserva.'
+            : state.noteProgress > 0
+              ? 'Las notas llenan la reserva.'
+              : 'Toca para saltar. Toca otra vez en el aire.';
     hintBaseOpacity =
-      state.collectedSparks > 2 ? '0.42' : state.currentChain >= 3 ? '0.72' : '0.9';
+      state.currentPulse <= 0.34
+        ? '0.84'
+        : state.noteProgress >= 75
+          ? '0.8'
+          : state.noteProgress > 0
+            ? '0.72'
+            : '0.9';
   };
 
   const renderHint = () => {
@@ -206,9 +214,9 @@ export const createHud = (root: HTMLElement) => {
     }
 
     latestState = state;
-    progress.textContent = renderProgress(state);
-    meter.style.width = `${Math.round(state.displayLevel * 100)}%`;
-    count.textContent = `x${state.currentChain}`;
+    progress.textContent = renderPulse(state);
+    meter.style.width = `${Math.round(state.currentPulse * 100)}%`;
+    count.textContent = `${state.noteProgress}/100`;
     renderHint();
     document.documentElement.style.setProperty('--emotion-progress', state.displayLevel.toFixed(3));
     document.body.dataset.emotion = state.tier;
@@ -223,7 +231,8 @@ export const createHud = (root: HTMLElement) => {
         `sparks ${snapshot.sparksCollected} | ` +
         `hits ${snapshot.obstacleHits} | ` +
         `max x${snapshot.maxChain} | ` +
-        `pulse ${Math.round(snapshot.averagePulse * 100)}%`;
+        `pulse ${Math.round(snapshot.averagePulse * 100)}% | ` +
+        `reserve ${latestState?.recoveryChances ?? '-'}`;
     };
 
     renderTelemetry();
