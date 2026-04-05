@@ -34,8 +34,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    this.statusText?.setText('Ascendiendo...');
-    this.hintText?.setText('La oscuridad queda atrás.');
+    this.statusText?.setText('Abriendo el interior...');
+    this.hintText?.setText('Las notas llenan tu reserva.');
     this.renderProgress(0.82);
     this.time.delayedCall(16, () => {
       void this.startJourney();
@@ -63,7 +63,7 @@ export class BootScene extends Phaser.Scene {
     brace.lineBetween(centerX, centerY - 76, centerX, centerY - 32);
 
     this.statusText = this.add
-      .text(centerX, centerY + 24, 'Abriendo la tierra herida...', {
+      .text(centerX, centerY + 24, 'Abriendo el interior...', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '18px',
         color: '#fff5ea'
@@ -71,7 +71,7 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hintText = this.add
-      .text(centerX, centerY + 52, 'El viaje comienza en el núcleo.', {
+      .text(centerX, centerY + 52, 'Las notas llenan tu reserva.', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '11px',
         color: '#d5d8df'
@@ -106,8 +106,8 @@ export class BootScene extends Phaser.Scene {
       this.scene.add('journey', JourneyScene, false);
       this.scene.start('journey');
     } catch {
-      this.statusText?.setText('Toca para recargar');
-      this.hintText?.setText('La ruta cambio tras una actualizacion. Toca para volver.');
+      this.statusText?.setText('No se abrió.');
+      this.hintText?.setText('Toca para recargar.');
       this.renderProgress(0.18);
       this.input.once('pointerdown', () => {
         window.location.reload();

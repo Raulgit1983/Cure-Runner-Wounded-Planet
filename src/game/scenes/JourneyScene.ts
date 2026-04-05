@@ -11,25 +11,25 @@ import { RunnerLoopSystem, type RunnerLoopSnapshot } from '@/game/systems/runner
 
 const SHARK_TEXTURE_KEY = 'shark-friend';
 const DEBUG_DECORATIVE_FAMILIES = ['backdrop', 'ground-markers', 'shark-friend'] as const;
-const FINISH_TITLE = 'Primera nota despertada';
-const FINISH_LABEL = 'La cura comienza';
-const FINISH_BODY = 'El planeta ha sentido tu esfuerzo.';
+const FINISH_TITLE = 'Nota despertada';
+const FINISH_LABEL = 'Algo cambió.';
+const FINISH_BODY = 'Algo ha despertado.';
 const FINISH_CLOSING = 'La luz vuelve poco a poco.';
-const FAIL_TITLE = 'Aún puedes seguir.';
-const FAIL_BODY = 'La luz no se apaga aquí.';
-const FAIL_CLOSING = 'Toca para intentarlo de nuevo.';
-const HOME_BUTTON_LABEL = 'Volver al inicio';
+const FAIL_TITLE = 'Aún hay luz.';
+const FAIL_BODY = 'El camino no se cierra.';
+const FAIL_CLOSING = 'Toca para volver.';
+const HOME_BUTTON_LABEL = 'Inicio';
 const CONTINUE_BUTTON_LABEL = 'Continuar';
 const CONTINUE_TITLE = 'Respira.';
-const CONTINUE_BODY = 'Las cosas bonitas también se construyen paso a paso.';
-const CONTINUE_CLOSING = 'Sigamos despertando este mundo juntos, con mamá también.';
+const CONTINUE_BODY = 'Cada paso despierta algo.';
+const CONTINUE_CLOSING = 'Sigamos.';
 const FIRST_HIT_REACTION = 'Ay!!';
 const SECOND_HIT_REACTION = 'Ñó!!!';
 const SHARK_PULSE_RESTORE = 0.26;
 const SUPPORTIVE_LINES = [
   'Sigue subiendo.',
-  'Cada paso lo despierta un poco más.',
-  'La luz vuelve poco a poco.'
+  'Lo va despertando.',
+  'Hay camino.'
 ] as const;
 const SHARK_LINES = ['Respira.', 'Arriba.', 'Toma aire.'] as const;
 
@@ -103,6 +103,9 @@ export class JourneyScene extends Phaser.Scene {
   private sharkGuidanceIndex = 0;
   private lastSeenPhraseId = '';
   private surfaceGuidanceShown = false;
+  private doubleJumpHintShown = false;
+  private firstCollectGuidanceShown = false;
+  private firstHitGuidanceShown = false;
   private offAudioCue?: () => void;
 
   constructor() {
@@ -141,6 +144,9 @@ export class JourneyScene extends Phaser.Scene {
     this.sharkGuidanceIndex = 0;
     this.lastSeenPhraseId = '';
     this.surfaceGuidanceShown = false;
+    this.doubleJumpHintShown = false;
+    this.firstCollectGuidanceShown = false;
+    this.firstHitGuidanceShown = false;
 
     this.emitVictoryState(false);
     this.emitFocusMode(false);
@@ -286,6 +292,7 @@ export class JourneyScene extends Phaser.Scene {
     if (!this.failResolved && !this.finishResolved) {
       this.updateSharkEvent(time, deltaSeconds, loopSnapshot);
       this.updateGuidanceMoments(time, loopSnapshot);
+      this.updateDoubleJumpHint(time, loopSnapshot);
     }
 
     this.updateFinishObjects(time, loopSnapshot);
@@ -302,7 +309,7 @@ export class JourneyScene extends Phaser.Scene {
     const liftTilt = Phaser.Math.Clamp(loopSnapshot.velocityY / 620, -0.18, 0.14);
     const impactDrop = loopSnapshot.staggerAmount * 16 + this.feedback.impact * 10;
     const rise = loopSnapshot.collectBurst * 8 + this.feedback.chain * 6;
-    const landingSquash = loopSnapshot.landingBurst * 0.08;
+    const landingSquash = loopSnapshot.landingBurst * 0.10;
     const victoryBounce =
       this.finishResolved
         ? Math.sin(this.finishSequence * Math.PI) * (1 - this.finishSequence * 0.28) * 7
@@ -581,6 +588,11 @@ export class JourneyScene extends Phaser.Scene {
     this.offAudioCue = audioCueBus.subscribe((event) => {
       if (event.type === 'spark_collect') {
         this.feedback.collect = Math.max(this.feedback.collect, Math.min(1, event.intensity * 0.5));
+
+        if (!this.firstCollectGuidanceShown) {
+          this.firstCollectGuidanceShown = true;
+          this.emitGuidanceLine('Eso despierta el planeta.', 2200, this.time.now);
+        }
       }
 
       if (event.type === 'chain_success') {
@@ -600,6 +612,11 @@ export class JourneyScene extends Phaser.Scene {
           } else {
             this.showHitReaction(FIRST_HIT_REACTION, 0);
           }
+        }
+
+        if (!this.firstHitGuidanceShown && !runFailed) {
+          this.firstHitGuidanceShown = true;
+          this.emitGuidanceLine('Vida baja. Busca notas.', 2200, this.time.now);
         }
       }
 
@@ -1142,6 +1159,7 @@ export class JourneyScene extends Phaser.Scene {
       intensity: 1.1
     });
     this.cameras.main.flash(100, 220, 255, 186, false);
+    this.cameras.main.zoomTo(1.06, 600, 'Cubic.easeOut');
   }
 
   private beginFailureBeat() {
@@ -1348,6 +1366,21 @@ export class JourneyScene extends Phaser.Scene {
     }
 
     this.lastSeenPhraseId = loopSnapshot.currentPhraseId;
+  }
+
+  private updateDoubleJumpHint(time: number, loopSnapshot: RunnerLoopSnapshot) {
+    if (this.doubleJumpHintShown) {
+      return;
+    }
+
+    if (
+      loopSnapshot.landingBurst > 0.1 &&
+      loopSnapshot.distanceTravelled > 120 &&
+      time - this.lastGuidanceAt > 2400
+    ) {
+      this.doubleJumpHintShown = true;
+      this.emitGuidanceLine('Toca en el aire para doble salto.', 2400, time);
+    }
   }
 
   private updateSharkEvent(time: number, deltaSeconds: number, loopSnapshot: RunnerLoopSnapshot) {

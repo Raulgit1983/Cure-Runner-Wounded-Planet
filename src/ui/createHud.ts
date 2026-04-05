@@ -11,6 +11,7 @@ export const createHud = (root: HTMLElement) => {
   let hintBaseOpacity = '0.9';
   let latestState: SessionSnapshot | null = null;
   let hintOverrideText: string | null = null;
+  let lastNoteProgress = 0;
   let runtimeDebug = {
     phrase: 'Waiting',
     coyoteMs: 0,
@@ -26,16 +27,19 @@ export const createHud = (root: HTMLElement) => {
     <div class="hud__row hud__row--compact">
       <div class="hud__pulse">
         <div class="hud__pulse-copy">
-          <span class="hud__eyebrow">Pulse</span>
+          <span class="hud__eyebrow">Vida</span>
           <strong class="hud__value" data-role="progress">0%</strong>
         </div>
         <div class="spark-meter" aria-hidden="true">
           <div class="spark-meter__fill" data-role="meter"></div>
         </div>
       </div>
-      <div class="hud__chain" data-role="count">0/100</div>
+      <div class="hud__notes">
+        <span class="hud__eyebrow">Reserva</span>
+        <strong class="hud__value" data-role="count">0/100</strong>
+      </div>
     </div>
-    <p class="hud__hint" data-role="hint">Toca para saltar. Toca otra vez en el aire.</p>
+    <p class="hud__hint" data-role="hint">Toca para saltar.</p>
     ${showTelemetry ? '<p class="hud__telemetry" data-role="telemetry"></p>' : ''}
     ${showTelemetry ? '<p class="hud__telemetry hud__telemetry--runtime" data-role="runtime"></p>' : ''}
     ${showTelemetry ? '<p class="hud__telemetry hud__telemetry--runtime" data-role="audit"></p>' : ''}
@@ -49,6 +53,7 @@ export const createHud = (root: HTMLElement) => {
   const runtime = root.querySelector<HTMLElement>('[data-role="runtime"]');
   const audit = root.querySelector<HTMLElement>('[data-role="audit"]');
   const pulse = root.querySelector<HTMLElement>('.hud__pulse');
+  const notes = root.querySelector<HTMLElement>('.hud__notes');
   let telemetryInterval = 0;
   let hintOverrideTimeout = 0;
 
@@ -60,6 +65,10 @@ export const createHud = (root: HTMLElement) => {
 
   if (count) {
     count.style.transition = 'opacity 180ms ease';
+  }
+
+  if (notes) {
+    notes.style.transition = 'opacity 180ms ease, transform 180ms ease';
   }
 
   if (hint) {
@@ -79,6 +88,11 @@ export const createHud = (root: HTMLElement) => {
 
     if (count) {
       count.style.opacity = victoryQuiet ? '0.22' : '1';
+    }
+
+    if (notes) {
+      notes.style.opacity = victoryQuiet ? '0.32' : '1';
+      notes.style.transform = victoryQuiet ? 'scale(0.985)' : 'scale(1)';
     }
 
     if (hint) {
@@ -108,22 +122,18 @@ export const createHud = (root: HTMLElement) => {
 
     hint.textContent =
       state.currentPulse <= 0.34
-        ? 'Busca aire. El tiburón puede ayudarte.'
+        ? 'Busca aire.'
         : state.recoveryChances > 0
-          ? 'Llevas una reserva contigo.'
-          : state.noteProgress >= 75
-            ? 'Ya casi llenas una reserva.'
-            : state.noteProgress > 0
-              ? 'Las notas llenan la reserva.'
-              : 'Toca para saltar. Toca otra vez en el aire.';
+          ? 'Reserva activa.'
+          : state.noteProgress > 0
+            ? 'Reserva creciendo.'
+            : 'Toca para saltar.';
     hintBaseOpacity =
       state.currentPulse <= 0.34
         ? '0.84'
-        : state.noteProgress >= 75
-          ? '0.8'
-          : state.noteProgress > 0
-            ? '0.72'
-            : '0.9';
+        : state.noteProgress > 0
+          ? '0.72'
+          : '0.9';
   };
 
   const renderHint = () => {
@@ -217,6 +227,14 @@ export const createHud = (root: HTMLElement) => {
     progress.textContent = renderPulse(state);
     meter.style.width = `${Math.round(state.currentPulse * 100)}%`;
     count.textContent = `${state.noteProgress}/100`;
+
+    if (notes && state.noteProgress > lastNoteProgress) {
+      notes.classList.remove('hud__notes--pulse');
+      void notes.offsetWidth; // Force reflow to restart animation
+      notes.classList.add('hud__notes--pulse');
+    }
+    lastNoteProgress = state.noteProgress;
+
     renderHint();
     document.documentElement.style.setProperty('--emotion-progress', state.displayLevel.toFixed(3));
     document.body.dataset.emotion = state.tier;

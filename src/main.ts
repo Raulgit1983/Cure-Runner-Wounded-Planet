@@ -15,46 +15,38 @@ if (!app) {
   throw new Error('App root not found.');
 }
 
+const savedProgress = localProgressStore.load();
+const isFirstRun = !savedProgress.collectedSparks && !savedProgress.awakeningLevel;
+
 app.innerHTML = `
   <div class="app-shell">
-    <section class="game-frame" aria-label="Cure Runner: Wounded Earth play area">
+    <section class="game-frame" aria-label="Cure Runner: Wounded Planet play area">
       <header class="hud" id="hud"></header>
       <div class="game-root" id="game-root"></div>
-      <div class="entry-shell" id="entry-shell" data-state="idle" data-stage="0">
+      <div class="entry-shell" id="entry-shell" data-state="idle"${isFirstRun ? ' data-first-run="true"' : ''}>
         <button class="entry-shell__button" id="entry-button" type="button">
-          
-          <div class="entry-flow__stage entry-flow__stage--0">
-            <h1 class="entry-flow__game-title">CURE RUNNER<span class="entry-flow__game-sub">WOUNDED EARTH</span></h1>
+
+          <div class="entry-flow__title-stage">
+            <h1 class="entry-flow__game-title">CURE RUNNER<span class="entry-flow__game-sub">WOUNDED PLANET</span></h1>
             <span class="entry-shell__planet-stage" aria-hidden="true">
               <span class="entry-shell__planet-orbit"></span>
               <img class="entry-shell__planet" src="${planetHomeUrl}" alt="" />
             </span>
-            <span class="entry-flow__cta">Toca para empezar</span>
-          </div>
-          
-          <div class="entry-flow__stage entry-flow__stage--1">
-            <div class="entry-flow__story-card">
-              <p class="entry-flow__story entry-flow__story--lead">El planeta aún respira.</p>
-              <p class="entry-flow__story">Asciende desde su interior y ayúdalo a despertar.</p>
-              <p class="entry-flow__story entry-flow__story--support">Cada paso puede devolverle luz.</p>
+            ${isFirstRun ? `
+            <div class="entry-flow__framing" aria-label="Misión">
+              <p class="entry-flow__framing-line">El planeta está herido.<br>Entra en su interior.</p>
+              <p class="entry-flow__framing-line entry-flow__framing-line--mission">Salta, recoge notas.<br>Devuelve pulso.</p>
             </div>
-            <span class="entry-flow__cta">Continuar</span>
-          </div>
-
-          <div class="entry-flow__stage entry-flow__stage--2">
-            <div class="entry-flow__instruction-block">
-              <p class="entry-flow__instruction">👆 Toca para saltar</p>
-            </div>
-            <div class="entry-flow__instruction-block">
-              <p class="entry-flow__instruction">👆👆 Toca en el aire<br>para doble salto</p>
-            </div>
-            <span class="entry-flow__cta">Comenzar</span>
+            ` : `
+            <p class="entry-flow__tagline">El planeta aún respira.</p>
+            `}
+            <span class="entry-flow__cta">${isFirstRun ? 'Empezar' : 'Toca para jugar'}</span>
           </div>
 
           <span class="entry-shell__callout" id="entry-loading">
-            <span class="entry-shell__eyebrow">Level 1: Wounded Earth</span>
-            <strong class="entry-shell__title" data-role="entry-title">Abriendo el planeta</strong>
-            <span class="entry-shell__copy" data-role="entry-copy">Cargando...</span>
+            <span class="entry-shell__eyebrow">Nivel 1 · Wounded Planet</span>
+            <strong class="entry-shell__title" data-role="entry-title">Abriendo el interior</strong>
+            <span class="entry-shell__copy" data-role="entry-copy">Las notas llenan tu reserva.</span>
             <span class="entry-shell__loader" aria-hidden="true">
               <span></span>
               <span></span>
@@ -68,7 +60,7 @@ app.innerHTML = `
   </div>
 `;
 
-sessionState.hydrate(localProgressStore.load());
+sessionState.hydrate(savedProgress);
 
 const hudRoot = document.querySelector<HTMLElement>('#hud');
 
@@ -95,7 +87,6 @@ const entryButton = document.querySelector<HTMLButtonElement>('#entry-button');
 const entryTitle = document.querySelector<HTMLElement>('[data-role="entry-title"]');
 const entryCopy = document.querySelector<HTMLElement>('[data-role="entry-copy"]');
 let bootInFlight = false;
-let introStage = 0;
 
 const setEntryEnabled = (enabled: boolean) => {
   if (!entryButton) {
@@ -127,11 +118,11 @@ const bootGame = async (trigger: string) => {
   entryShell?.setAttribute('data-state', 'loading');
 
   if (entryTitle) {
-    entryTitle.textContent = 'Abriendo el planeta...';
+    entryTitle.textContent = 'Abriendo el interior...';
   }
 
   if (entryCopy) {
-    entryCopy.textContent = 'Cargando el Nivel 1.';
+    entryCopy.textContent = 'Cargando...';
   }
 
   await new Promise<void>((resolve) => {
@@ -176,11 +167,6 @@ const startFromEntry = (event: PointerEvent | KeyboardEvent) => {
 
   event.preventDefault();
 
-  if (introStage < 2) {
-    introStage += 1;
-    entryShell?.setAttribute('data-stage', introStage.toString());
-    return;
-  }
   void bootGame(event.type).catch((error: unknown) => {
     bootInFlight = false;
     setEntryEnabled(true);
@@ -191,11 +177,11 @@ const startFromEntry = (event: PointerEvent | KeyboardEvent) => {
     });
 
     if (entryTitle) {
-      entryTitle.textContent = 'Entra en el planeta';
+      entryTitle.textContent = 'No se abrió.';
     }
 
     if (entryCopy) {
-      entryCopy.textContent = 'El camino no se abrió. Toca otra vez.';
+      entryCopy.textContent = 'Toca para recargar.';
     }
   });
 };

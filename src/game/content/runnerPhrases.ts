@@ -2,6 +2,7 @@ export type CollectibleVariant = 'note' | 'brush' | 'spark';
 export type HazardVariant = 'sludge' | 'warden' | 'hound';
 export type PhraseFamily = 'onboarding' | 'tension' | 'recovery';
 export type RunnerPhraseId =
+  | 'onboarding_intro'
   | 'onboarding_arc'
   | 'tension_drill'
   | 'recovery_breath'
@@ -32,6 +33,17 @@ export interface RunnerPhrase {
 }
 
 export const runnerPhrases: Record<RunnerPhraseId, RunnerPhrase> = {
+  onboarding_intro: {
+    id: 'onboarding_intro',
+    label: 'Onboarding Intro',
+    family: 'onboarding',
+    spacingAfter: 320,
+    items: [
+      { kind: 'collectible', variant: 'spark', x: 94, y: 44 },
+      { kind: 'collectible', variant: 'note', x: 168, y: 68 },
+      { kind: 'collectible', variant: 'brush', x: 252, y: 52 }
+    ]
+  },
   onboarding_arc: {
     id: 'onboarding_arc',
     label: 'Onboarding Arc',

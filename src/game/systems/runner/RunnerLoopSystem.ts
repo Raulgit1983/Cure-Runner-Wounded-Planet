@@ -130,9 +130,9 @@ export class RunnerLoopSystem {
   private landingBurst = 0;
   private recoveryPhraseIndex = 0;
   private currentSpeed: number = runnerConfig.movement.baseSpeed;
-  private currentPhraseId: string = runnerPhrases.onboarding_arc.id;
-  private currentPhraseLabel: string = runnerPhrases.onboarding_arc.label;
-  private currentPhraseFamily: PhraseFamily = runnerPhrases.onboarding_arc.family;
+  private currentPhraseId: string = runnerPhrases.onboarding_intro.id;
+  private currentPhraseLabel: string = runnerPhrases.onboarding_intro.label;
+  private currentPhraseFamily: PhraseFamily = runnerPhrases.onboarding_intro.family;
   private failed = false;
 
   constructor(
@@ -378,7 +378,7 @@ export class RunnerLoopSystem {
   private pickNextPhrase(snapshot = sessionState.snapshot()) {
     if (this.initialPhrasePending) {
       this.initialPhrasePending = false;
-      return runnerPhrases.onboarding_arc;
+      return runnerPhrases.onboarding_intro;
     }
 
     if (this.recoveryQueued || snapshot.currentPulse <= runnerConfig.director.recoveryPulseThreshold) {
