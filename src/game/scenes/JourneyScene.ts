@@ -32,6 +32,20 @@ const SUPPORTIVE_LINES = [
   'Hay camino.'
 ] as const;
 const SHARK_LINES = ['Respira.', 'Arriba.', 'Toma aire.'] as const;
+const HERO_HIT_TEXTURE_KEY = 'hero-hit-stagger';
+const HERO_JUMP_RISE_TEXTURE_KEY = 'hero-jump-rise';
+const HERO_JUMP_FALL_TEXTURE_KEY = 'hero-jump-fall';
+const HERO_FINISH_TEXTURE_KEY = 'hero-finish-awakened';
+const HERO_HIT_POSE_LOCK_SECONDS = 0.15;
+const HERO_AIR_RISE_THRESHOLD = -32;
+const HERO_AIR_FALL_THRESHOLD = 32;
+const HERO_AIR_APEX_DEADZONE = 12;
+type HeroTextureKey =
+  | typeof heroProfile.textureKey
+  | typeof HERO_HIT_TEXTURE_KEY
+  | typeof HERO_JUMP_RISE_TEXTURE_KEY
+  | typeof HERO_JUMP_FALL_TEXTURE_KEY
+  | typeof HERO_FINISH_TEXTURE_KEY;
 
 export class JourneyScene extends Phaser.Scene {
   private readonly showDebug =
@@ -71,6 +85,7 @@ export class JourneyScene extends Phaser.Scene {
   private baseHeroScale = 1;
   private heroRenderScaleX = 1;
   private heroRenderScaleY = 1;
+  private activeHeroTextureKey: HeroTextureKey = heroProfile.textureKey;
   private backdropDistance = 0;
   private backdropSurfaceProgress = 0;
   private backdropFinishRevealProgress = 0;
@@ -91,6 +106,7 @@ export class JourneyScene extends Phaser.Scene {
   private hitReactionTimer = 0;
   private hitReactionDuration = 0.56;
   private hitReactionStrength = 0;
+  private hitPoseLockTimer = 0;
   private sharkBurst = 0;
   private sharkCooldown = 3.8;
   private sharkDuration = 1.9;
@@ -135,6 +151,8 @@ export class JourneyScene extends Phaser.Scene {
     this.returnHomeQueued = false;
     this.hitReactionTimer = 0;
     this.hitReactionStrength = 0;
+    this.hitPoseLockTimer = 0;
+    this.activeHeroTextureKey = heroProfile.textureKey;
     this.sharkBurst = 0;
     this.sharkCooldown = 3.8;
     this.sharkActive = false;
@@ -169,6 +187,7 @@ export class JourneyScene extends Phaser.Scene {
       .image(heroX, heroY, heroProfile.textureKey)
       .setOrigin(heroProfile.renderOrigin.x, heroProfile.renderOrigin.y)
       .setDepth(5);
+    this.activeHeroTextureKey = this.hero.texture.key as HeroTextureKey;
     const hitReaction = this.createHitReaction();
     this.hitReaction = hitReaction.container;
     this.hitReactionText = hitReaction.text;
@@ -237,6 +256,7 @@ export class JourneyScene extends Phaser.Scene {
     this.feedback.awakening = Math.max(0, this.feedback.awakening - deltaSeconds * 1.5);
     this.finishPulse = Math.max(0, this.finishPulse - deltaSeconds * 1.8);
     this.hitReactionTimer = Math.max(0, this.hitReactionTimer - deltaSeconds);
+    this.hitPoseLockTimer = Math.max(0, this.hitPoseLockTimer - deltaSeconds);
     this.sharkBurst = Math.max(0, this.sharkBurst - deltaSeconds * 2.8);
 
     const emotionalLevel = Phaser.Math.Clamp(
@@ -329,6 +349,7 @@ export class JourneyScene extends Phaser.Scene {
 
     this.heroRenderScaleX = Phaser.Math.Linear(this.heroRenderScaleX, targetScaleX, 0.16);
     this.heroRenderScaleY = Phaser.Math.Linear(this.heroRenderScaleY, targetScaleY, 0.16);
+    this.updateHeroTexture(loopSnapshot);
 
     this.hero
       .setPosition(
@@ -1143,6 +1164,7 @@ export class JourneyScene extends Phaser.Scene {
     this.continueResolved = false;
     this.finishPulse = 1;
     this.hitReactionTimer = 0;
+    this.hitPoseLockTimer = 0;
     this.haltSharkEvent();
     this.emitFocusMode(true);
     this.emitVictoryState(true);
@@ -1170,6 +1192,7 @@ export class JourneyScene extends Phaser.Scene {
     this.failResolved = true;
     this.restartQueued = false;
     this.hitReactionTimer = 0;
+    this.hitPoseLockTimer = 0;
     this.finishStage.setAlpha(0);
     this.continueStage.setAlpha(0);
     this.ingredient.setAlpha(0);
@@ -1248,7 +1271,81 @@ export class JourneyScene extends Phaser.Scene {
     this.hitReactionText.setText(text).setFontSize(strength > 0 ? 17 : 16);
     this.hitReactionTimer = this.hitReactionDuration;
     this.hitReactionStrength = strength;
+    this.hitPoseLockTimer = Math.max(this.hitPoseLockTimer, HERO_HIT_POSE_LOCK_SECONDS);
     this.hitReaction.setVisible(true).setAlpha(1).setScale(0.94 + strength * 0.05);
+  }
+
+  private updateHeroTexture(loopSnapshot: RunnerLoopSnapshot) {
+    const nextTextureKey = this.resolveHeroTextureKey(loopSnapshot);
+    const currentTextureKey = this.hero.texture.key as HeroTextureKey;
+
+    if (currentTextureKey === nextTextureKey) {
+      this.activeHeroTextureKey = currentTextureKey;
+      return;
+    }
+
+    this.hero.setTexture(nextTextureKey);
+    this.activeHeroTextureKey = nextTextureKey;
+  }
+
+  private resolveHeroTextureKey(loopSnapshot: RunnerLoopSnapshot): HeroTextureKey {
+    if (this.finishResolved && this.textures.exists(HERO_FINISH_TEXTURE_KEY)) {
+      return HERO_FINISH_TEXTURE_KEY;
+    }
+
+    if (this.hitPoseLockTimer > 0 && this.textures.exists(HERO_HIT_TEXTURE_KEY)) {
+      return HERO_HIT_TEXTURE_KEY;
+    }
+
+    if (loopSnapshot.grounded) {
+      return heroProfile.textureKey;
+    }
+
+    const velocityY = loopSnapshot.velocityY;
+
+    if (velocityY <= HERO_AIR_RISE_THRESHOLD && this.textures.exists(HERO_JUMP_RISE_TEXTURE_KEY)) {
+      return HERO_JUMP_RISE_TEXTURE_KEY;
+    }
+
+    if (velocityY >= HERO_AIR_FALL_THRESHOLD && this.textures.exists(HERO_JUMP_FALL_TEXTURE_KEY)) {
+      return HERO_JUMP_FALL_TEXTURE_KEY;
+    }
+
+    // Keep the previous air pose through the apex to avoid rise/fall flicker.
+    if (Math.abs(velocityY) <= HERO_AIR_APEX_DEADZONE) {
+      if (
+        this.activeHeroTextureKey === HERO_JUMP_RISE_TEXTURE_KEY ||
+        this.activeHeroTextureKey === HERO_JUMP_FALL_TEXTURE_KEY
+      ) {
+        return this.activeHeroTextureKey;
+      }
+    }
+
+    if (
+      this.activeHeroTextureKey === HERO_JUMP_RISE_TEXTURE_KEY &&
+      velocityY < HERO_AIR_FALL_THRESHOLD &&
+      this.textures.exists(HERO_JUMP_RISE_TEXTURE_KEY)
+    ) {
+      return HERO_JUMP_RISE_TEXTURE_KEY;
+    }
+
+    if (
+      this.activeHeroTextureKey === HERO_JUMP_FALL_TEXTURE_KEY &&
+      velocityY > HERO_AIR_RISE_THRESHOLD &&
+      this.textures.exists(HERO_JUMP_FALL_TEXTURE_KEY)
+    ) {
+      return HERO_JUMP_FALL_TEXTURE_KEY;
+    }
+
+    if (velocityY < 0 && this.textures.exists(HERO_JUMP_RISE_TEXTURE_KEY)) {
+      return HERO_JUMP_RISE_TEXTURE_KEY;
+    }
+
+    if (this.textures.exists(HERO_JUMP_FALL_TEXTURE_KEY)) {
+      return HERO_JUMP_FALL_TEXTURE_KEY;
+    }
+
+    return heroProfile.textureKey;
   }
 
   private updateHitReaction() {

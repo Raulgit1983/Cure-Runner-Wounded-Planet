@@ -3,6 +3,7 @@ export type AudioCueType =
   | 'chain_success'
   | 'pulse_drop'
   | 'awakening_gain'
+  | 'reserve_fill'
   | 'victory_win'
   | 'jump_player';
 

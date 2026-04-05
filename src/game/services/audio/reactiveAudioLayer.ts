@@ -156,6 +156,25 @@ class ReactiveAudioLayer {
       return;
     }
 
+    if (event.type === 'reserve_fill') {
+      this.playTone(context, master, {
+        from: 880,
+        to: 1320,
+        duration: 0.22,
+        volume: 0.06,
+        type: 'triangle'
+      });
+      this.playTone(context, master, {
+        from: 1320,
+        to: 1760,
+        duration: 0.36,
+        volume: 0.04,
+        delay: 0.08,
+        type: 'sine'
+      });
+      return;
+    }
+
     if (event.type === 'victory_win') {
       this.playTone(context, master, {
         from: 392,

@@ -218,6 +218,9 @@ export const createHud = (root: HTMLElement) => {
   window.addEventListener('mateo:focus-mode', handleFocusMode as EventListener);
   window.addEventListener('mateo:guidance-line', handleGuidanceLine as EventListener);
 
+  let lastRecoveryChances = 0;
+  let textOverrideUntil = 0;
+
   const update = (state: SessionSnapshot) => {
     if (!progress || !meter || !hint || !count) {
       return;
@@ -226,14 +229,26 @@ export const createHud = (root: HTMLElement) => {
     latestState = state;
     progress.textContent = renderPulse(state);
     meter.style.width = `${Math.round(state.currentPulse * 100)}%`;
-    count.textContent = `${state.noteProgress}/100`;
-
-    if (notes && state.noteProgress > lastNoteProgress) {
-      notes.classList.remove('hud__notes--pulse');
-      void notes.offsetWidth; // Force reflow to restart animation
-      notes.classList.add('hud__notes--pulse');
+    
+    const now = Date.now();
+    if (now > textOverrideUntil) {
+      count.textContent = `${state.noteProgress}/100`;
     }
+
+    if (state.recoveryChances > lastRecoveryChances && lastRecoveryChances > 0) {
+      notes?.classList.remove('hud__notes--pulse', 'hud__notes--full-burst');
+      if (notes) void notes.offsetWidth;
+      notes?.classList.add('hud__notes--full-burst');
+      count.textContent = 'MÁX';
+      textOverrideUntil = now + 900;
+    } else if (state.noteProgress > lastNoteProgress && (now > textOverrideUntil)) {
+      notes?.classList.remove('hud__notes--pulse', 'hud__notes--full-burst');
+      if (notes) void notes.offsetWidth;
+      notes?.classList.add('hud__notes--pulse');
+    }
+    
     lastNoteProgress = state.noteProgress;
+    lastRecoveryChances = state.recoveryChances;
 
     renderHint();
     document.documentElement.style.setProperty('--emotion-progress', state.displayLevel.toFixed(3));

@@ -2,6 +2,10 @@ import Phaser from 'phaser';
 
 import { importWithRecovery } from '@/app/importWithRecovery';
 import sharkTextureUrl from '@/assets/creatures/tiburoncin-ok.png';
+import heroFinishAwakenedTextureUrl from '@/assets/hero/hero-finish-awakened.webp';
+import heroHitStaggerTextureUrl from '@/assets/hero/hero-hit-stagger.webp';
+import heroJumpFallTextureUrl from '@/assets/hero/hero-jump-fall.webp';
+import heroJumpRiseTextureUrl from '@/assets/hero/hero-jump-rise.webp';
 import heroTextureUrl from '@/assets/hero/hero-main.webp';
 import { heroProfile } from '@/game/content/heroProfile';
 
@@ -30,6 +34,10 @@ export class BootScene extends Phaser.Scene {
     });
 
     this.load.image(heroProfile.textureKey, heroTextureUrl);
+    this.load.image('hero-hit-stagger', heroHitStaggerTextureUrl);
+    this.load.image('hero-jump-rise', heroJumpRiseTextureUrl);
+    this.load.image('hero-jump-fall', heroJumpFallTextureUrl);
+    this.load.image('hero-finish-awakened', heroFinishAwakenedTextureUrl);
     this.load.image('shark-friend', sharkTextureUrl);
   }
 

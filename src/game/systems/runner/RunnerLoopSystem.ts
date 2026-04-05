@@ -673,6 +673,15 @@ export class RunnerLoopSystem {
         amount: awakeningGain
       });
     }
+
+    if (transition.after.recoveryChances > transition.before.recoveryChances) {
+      audioCueBus.emit({
+        type: 'reserve_fill',
+        intensity: 1,
+        chain: nextChain,
+        amount: 1
+      });
+    }
   }
 
   private hitHazard(entity: RunnerEntity) {
