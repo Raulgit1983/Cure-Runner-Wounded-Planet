@@ -1,5 +1,6 @@
 export type CollectibleVariant = 'note' | 'brush' | 'spark';
 export type HazardVariant = 'sludge' | 'warden' | 'hound' | 'shard' | 'mirror' | 'crown';
+export type PlatformVariant = 'ledge';
 export type PhraseFamily = 'onboarding' | 'tension' | 'recovery';
 export type RunnerPhraseId = string;
 
@@ -17,7 +18,15 @@ export interface HazardPhraseItem {
   y: number;
 }
 
-export type RunnerPhraseItem = CollectiblePhraseItem | HazardPhraseItem;
+export interface PlatformPhraseItem {
+  kind: 'platform';
+  variant: PlatformVariant;
+  x: number;
+  y: number;
+  width: number;
+}
+
+export type RunnerPhraseItem = CollectiblePhraseItem | HazardPhraseItem | PlatformPhraseItem;
 
 export interface RunnerPhrase {
   id: RunnerPhraseId;
@@ -120,6 +129,24 @@ export const runnerPhrases: RunnerPhraseMap = {
       { kind: 'collectible', variant: 'spark', x: 326, y: 156 },
       { kind: 'collectible', variant: 'brush', x: 386, y: 126 },
       { kind: 'collectible', variant: 'note', x: 446, y: 96 }
+    ]
+  },
+  onboarding_upper: {
+    id: 'onboarding_upper',
+    label: 'Onboarding Upper',
+    family: 'onboarding',
+    spacingAfter: 572,
+    items: [
+      { kind: 'collectible', variant: 'note', x: 92, y: 72 },
+      { kind: 'collectible', variant: 'spark', x: 146, y: 108 },
+      { kind: 'collectible', variant: 'brush', x: 196, y: 142 },
+      { kind: 'hazard', variant: 'sludge', x: 182, y: 18 },
+      { kind: 'platform', variant: 'ledge', x: 300, y: 168, width: 172 },
+      { kind: 'collectible', variant: 'note', x: 250, y: 176 },
+      { kind: 'collectible', variant: 'spark', x: 304, y: 208 },
+      { kind: 'collectible', variant: 'brush', x: 356, y: 190 },
+      { kind: 'hazard', variant: 'hound', x: 434, y: 16 },
+      { kind: 'collectible', variant: 'note', x: 446, y: 152 }
     ]
   },
   onboarding_arc: {
@@ -234,11 +261,14 @@ export const runnerPhrases: RunnerPhraseMap = {
       { kind: 'collectible', variant: 'spark', x: 170, y: 60 },
       { kind: 'collectible', variant: 'note', x: 202, y: 86 },
       { kind: 'collectible', variant: 'brush', x: 262, y: 126 },
-      { kind: 'hazard', variant: 'warden', x: 324, y: 162 },
-      { kind: 'collectible', variant: 'spark', x: 382, y: 174 },
-      { kind: 'hazard', variant: 'sludge', x: 446, y: 18 },
-      { kind: 'collectible', variant: 'note', x: 510, y: 118 },
-      { kind: 'collectible', variant: 'brush', x: 566, y: 86 }
+      { kind: 'hazard', variant: 'warden', x: 270, y: 150 },
+      { kind: 'platform', variant: 'ledge', x: 396, y: 182, width: 184 },
+      { kind: 'collectible', variant: 'spark', x: 344, y: 178 },
+      { kind: 'collectible', variant: 'note', x: 396, y: 210 },
+      { kind: 'collectible', variant: 'brush', x: 448, y: 194 },
+      { kind: 'hazard', variant: 'sludge', x: 546, y: 18 },
+      { kind: 'collectible', variant: 'note', x: 514, y: 154 },
+      { kind: 'collectible', variant: 'brush', x: 568, y: 116 }
     ]
   },
   tension_triplet: {
@@ -292,10 +322,10 @@ export const runnerPhrases: RunnerPhraseMap = {
 export const runnerPhraseRotation: RunnerPhraseId[] = [
   'onboarding_arc',
   'tension_step',
+  'tension_ladder',
   'tension_arch',
   'tension_weave',
   'tension_ceiling',
   'tension_drill',
-  'tension_ladder',
   'tension_triplet'
 ];

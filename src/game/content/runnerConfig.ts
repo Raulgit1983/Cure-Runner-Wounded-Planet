@@ -13,9 +13,10 @@ export const runnerConfig = {
     displaySpeedBonus: 0.16
   },
   jump: {
-    maxJumps: 2,
+    maxJumps: 3,
     velocity: 472,
     doubleJumpVelocity: 448,
+    thirdJumpVelocity: 424,
     riseGravity: 1260,
     fallGravity: 1760,
     holdGravityMultiplier: 0.58,

@@ -34,9 +34,12 @@ export const createHud = (root: HTMLElement) => {
           <div class="spark-meter__fill" data-role="meter"></div>
         </div>
       </div>
-      <div class="hud__notes">
-        <span class="hud__eyebrow" data-role="notes-label">Reserva</span>
-        <strong class="hud__value" data-role="count">0/100</strong>
+      <div class="hud__meta-actions">
+        <div class="hud__notes">
+          <span class="hud__eyebrow" data-role="notes-label">Reserva</span>
+          <strong class="hud__value" data-role="count">0/100</strong>
+        </div>
+        <button class="hud__action" data-role="pause" type="button">Pausa</button>
       </div>
     </div>
     <p class="hud__hint" data-role="hint">Toca para saltar.</p>
@@ -55,8 +58,15 @@ export const createHud = (root: HTMLElement) => {
   const audit = root.querySelector<HTMLElement>('[data-role="audit"]');
   const pulse = root.querySelector<HTMLElement>('.hud__pulse');
   const notes = root.querySelector<HTMLElement>('.hud__notes');
+  const pauseButton = root.querySelector<HTMLButtonElement>('[data-role="pause"]');
   let telemetryInterval = 0;
   let hintOverrideTimeout = 0;
+  const handlePauseClick = (event: PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    window.dispatchEvent(new CustomEvent('mateo:pause-request'));
+  };
 
   root.style.transition = 'opacity 180ms ease, transform 180ms ease';
 
@@ -218,6 +228,7 @@ export const createHud = (root: HTMLElement) => {
   window.addEventListener('mateo:victory-state', handleVictoryState as EventListener);
   window.addEventListener('mateo:focus-mode', handleFocusMode as EventListener);
   window.addEventListener('mateo:guidance-line', handleGuidanceLine as EventListener);
+  pauseButton?.addEventListener('pointerdown', handlePauseClick);
 
   let lastRecoveryChances = 0;
   let textOverrideUntil = 0;
@@ -300,6 +311,7 @@ export const createHud = (root: HTMLElement) => {
       window.removeEventListener('mateo:victory-state', handleVictoryState as EventListener);
       window.removeEventListener('mateo:focus-mode', handleFocusMode as EventListener);
       window.removeEventListener('mateo:guidance-line', handleGuidanceLine as EventListener);
+      pauseButton?.removeEventListener('pointerdown', handlePauseClick);
     }
   };
 };

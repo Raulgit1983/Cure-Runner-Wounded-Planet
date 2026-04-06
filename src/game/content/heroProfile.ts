@@ -6,7 +6,7 @@ export const heroProfile = {
   },
   mobileScale: {
     minPx: 88,
-    preferredPx: 128,
+    preferredPx: 114,
     maxPx: 160
   },
   collision: {

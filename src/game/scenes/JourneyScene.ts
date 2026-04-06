@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 import { heroProfile } from '@/game/content/heroProfile';
+import { quickHelpContent } from '@/game/content/helpContent';
 import { journeyStages, type JourneyStageDefinition, type JourneyStageKey } from '@/game/content/journeyStages';
 import { journeyConfig } from '@/game/content/journeyConfig';
 import { runnerConfig } from '@/game/content/runnerConfig';
@@ -23,9 +24,12 @@ const MOONLIGHT_FINISH_BODY = 'No hay más niveles todavía.';
 const MOONLIGHT_FINISH_CLOSING = 'Puedes repetir o volver.';
 const FINISH_REWARD_ZONE_X = 236;
 const FINISH_REWARD_ZONE_Y = 332;
-const FINISH_HERO_REACH_X = FINISH_REWARD_ZONE_X - 70;
-const FINISH_HERO_REACH_Y = FINISH_REWARD_ZONE_Y + 128;
-const FINISH_CONTACT_BEAT_AT = 0.6;
+const FINISH_INGREDIENT_ZONE_X = FINISH_REWARD_ZONE_X + 36;
+const FINISH_INGREDIENT_ZONE_Y = FINISH_REWARD_ZONE_Y + 16;
+const FINISH_HERO_REACH_X = FINISH_INGREDIENT_ZONE_X - 40;
+const FINISH_HERO_REACH_Y = FINISH_REWARD_ZONE_Y + 120;
+const FINISH_CONTACT_BEAT_AT = 0.58;
+const FINISH_POST_CONTACT_FLOAT_RISE = 10;
 const FINISH_PANEL_REVEAL_AT = 0.94;
 const FINISH_SEQUENCE_SPEED = 1.85;
 const FAIL_TITLE = 'Aún hay luz.';
@@ -38,6 +42,12 @@ const HOME_BUTTON_LABEL = 'Inicio';
 const CONTINUE_BUTTON_LABEL = 'Continuar';
 const FINISH_CONTINUE_BUTTON_LABEL = 'Seguir';
 const REPLAY_BUTTON_LABEL = 'Repetir';
+const HELP_BUTTON_LABEL = 'Ayuda';
+const PAUSE_TITLE = 'Pausa.';
+const PAUSE_BODY = 'Puedes seguir cuando quieras.';
+const PAUSE_CLOSING = 'La ruta espera.';
+const MOONLIGHT_OPPORTUNITY_LINE = 'Queda una oportunidad.';
+const MOONLIGHT_OPPORTUNITY_PULSE = 0.46;
 const CONTINUE_TITLE = 'Respira.';
 const CONTINUE_BODY = 'Cada paso despierta algo.';
 const CONTINUE_CLOSING = 'Sigamos.';
@@ -58,9 +68,11 @@ const HERO_HIT_POSE_LOCK_SECONDS = 0.15;
 const HERO_AIR_RISE_THRESHOLD = -32;
 const HERO_AIR_FALL_THRESHOLD = 32;
 const HERO_AIR_APEX_DEADZONE = 12;
+const HERO_FOOTING_VISUAL_OFFSET_Y = 4;
 type DiscoveryBeatId =
   | 'jump_intro'
   | 'double_jump_intro'
+  | 'upper_route_intro'
   | 'notes_intro'
   | 'hazard_intro'
   | 'reserve_hint'
@@ -165,6 +177,11 @@ const DISCOVERY_BEATS: Record<DiscoveryBeatId, DiscoveryBeatDefinition> = {
     text: 'Toca otra vez.',
     durationMs: 2200
   },
+  upper_route_intro: {
+    mode: 'guidance',
+    text: 'Una más para subir.',
+    durationMs: 2300
+  },
   notes_intro: {
     mode: 'panel',
     title: 'Notas.',
@@ -201,7 +218,7 @@ const DISCOVERY_BEATS: Record<DiscoveryBeatId, DiscoveryBeatDefinition> = {
   },
   shark_catch: {
     mode: 'panel',
-    title: 'Tiburón.',
+    title: 'Tiburoncín.',
     body: 'Devuelve aire si falta.',
     closing: 'Alcánzalo arriba.'
   }
@@ -249,6 +266,9 @@ export class JourneyScene extends Phaser.Scene {
   private discoveryTitleText!: Phaser.GameObjects.Text;
   private discoveryBodyText!: Phaser.GameObjects.Text;
   private discoveryClosingText!: Phaser.GameObjects.Text;
+  private pauseOverlay!: Phaser.GameObjects.Rectangle;
+  private pauseStage!: Phaser.GameObjects.Container;
+  private helpStage!: Phaser.GameObjects.Container;
   private retryOverlay!: Phaser.GameObjects.Rectangle;
   private runnerLoop!: RunnerLoopSystem;
   private shark!: Phaser.GameObjects.Container;
@@ -297,6 +317,7 @@ export class JourneyScene extends Phaser.Scene {
   private moonlightBeatGuidanceShown = false;
   private firstJumpGuidanceShown = false;
   private doubleJumpHintShown = false;
+  private upperRouteHintShown = false;
   private firstCollectGuidanceShown = false;
   private firstHitGuidanceShown = false;
   private reserveGuidanceShown = false;
@@ -307,6 +328,19 @@ export class JourneyScene extends Phaser.Scene {
   private activeDiscoveryBeatId: DiscoveryBeatId | null = null;
   private queuedDiscoveryBeatId: DiscoveryBeatId | null = null;
   private offAudioCue?: () => void;
+  private pauseOpen = false;
+  private helpOpen = false;
+  private moonlightOpportunityAvailable = false;
+  private readonly handlePauseRequest = () => {
+    this.togglePauseStage();
+  };
+  private readonly handlePauseKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' && event.key.toLowerCase() !== 'p') {
+      return;
+    }
+
+    this.togglePauseStage();
+  };
 
   constructor() {
     super('journey');
@@ -360,6 +394,7 @@ export class JourneyScene extends Phaser.Scene {
     this.moonlightBeatGuidanceShown = false;
     this.firstJumpGuidanceShown = false;
     this.doubleJumpHintShown = false;
+    this.upperRouteHintShown = false;
     this.firstCollectGuidanceShown = false;
     this.firstHitGuidanceShown = false;
     this.reserveGuidanceShown = false;
@@ -369,9 +404,13 @@ export class JourneyScene extends Phaser.Scene {
     this.sharkBenefitGuidanceShown = false;
     this.activeDiscoveryBeatId = null;
     this.queuedDiscoveryBeatId = null;
+    this.pauseOpen = false;
+    this.helpOpen = false;
+    this.moonlightOpportunityAvailable = this.stage.backdropKind === 'moonlight-mountain';
 
     this.emitVictoryState(false);
     this.emitFocusMode(false);
+    this.emitUiScreen('playing');
     this.backdrop = this.add.graphics().setDepth(0);
     this.finishScrim = this.add
       .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x0a0d12, 0)
@@ -382,10 +421,10 @@ export class JourneyScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(0.6);
     this.heroShadow = this.add
-      .ellipse(heroX, runnerConfig.visual.groundLineY + 8, 132, 28, 0x120b14, 0.18)
+      .ellipse(heroX, runnerConfig.visual.groundLineY + 8, 112, 22, 0x120b14, 0.18)
       .setDepth(1);
     this.heroAura = this.add
-      .ellipse(heroX - 8, heroY + 10, 122, 74, 0xa4ff68, 0.035)
+      .ellipse(heroX - 8, heroY + 10, 110, 66, 0xa4ff68, 0.035)
       .setDepth(2);
 
     this.hero = this.add
@@ -434,6 +473,26 @@ export class JourneyScene extends Phaser.Scene {
     this.discoveryTitleText = discoveryStage.title;
     this.discoveryBodyText = discoveryStage.body;
     this.discoveryClosingText = discoveryStage.closing;
+    this.pauseOverlay = this.add
+      .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x071018, 0.001)
+      .setDepth(6.7)
+      .setAlpha(0)
+      .setVisible(false)
+      .setInteractive();
+    this.pauseOverlay.on(
+      'pointerdown',
+      (
+        _pointer: Phaser.Input.Pointer,
+        _localX: number,
+        _localY: number,
+        event: Phaser.Types.Input.EventData
+      ) => {
+        event.stopPropagation();
+      }
+    );
+    this.pauseOverlay.disableInteractive();
+    this.pauseStage = this.createPauseStage(width * 0.5, 306);
+    this.helpStage = this.createHelpStage(width * 0.5, 304);
     this.retryOverlay = this.add
       .rectangle(width * 0.5, journeyConfig.logicalSize.height * 0.5, width, journeyConfig.logicalSize.height, 0x000000, 0.001)
       .setDepth(6.76)
@@ -460,6 +519,11 @@ export class JourneyScene extends Phaser.Scene {
       });
     }
 
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mateo:pause-request', this.handlePauseRequest as EventListener);
+      window.addEventListener('keydown', this.handlePauseKeyDown);
+    }
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
   }
 
@@ -476,7 +540,9 @@ export class JourneyScene extends Phaser.Scene {
     const loopSnapshot = this.runnerLoop.snapshot();
 
     if (loopSnapshot.runFailed && !this.failResolved && !this.finishResolved) {
-      this.beginFailureBeat();
+      if (!this.tryMoonlightOpportunity()) {
+        this.beginFailureBeat();
+      }
     }
 
     if (this.finishResolved) {
@@ -573,6 +639,11 @@ export class JourneyScene extends Phaser.Scene {
           Phaser.Math.Clamp((this.finishSequence - 0.16) / 0.4, 0, 1)
         )
       : 0;
+    const finishFloatProgress = this.finishResolved
+      ? Phaser.Math.Easing.Sine.Out(
+          Phaser.Math.Clamp((this.finishSequence - FINISH_CONTACT_BEAT_AT) / 0.18, 0, 1)
+        )
+      : 0;
     const victoryBounce =
       this.finishResolved
         ? Math.sin(this.finishSequence * Math.PI) * (1 - this.finishSequence * 0.28) * 7
@@ -603,12 +674,18 @@ export class JourneyScene extends Phaser.Scene {
       landingSquash * 6 +
       driftLift -
       loopSnapshot.surfaceProgress * 6 -
-      victoryBounce;
+      victoryBounce +
+      HERO_FOOTING_VISUAL_OFFSET_Y;
+    const celebrationFloatX = finishFloatProgress > 0 ? Math.sin(time * 0.0032) * 2.2 : 0;
+    const celebrationFloatY =
+      finishFloatProgress > 0
+        ? Math.sin(time * 0.0041) * 2.8 + Math.cos(time * 0.0026) * 1.6 - finishFloatProgress * FINISH_POST_CONTACT_FLOAT_RISE
+        : 0;
     const heroDisplayX = this.finishResolved
-      ? Phaser.Math.Linear(heroBaseX, FINISH_HERO_REACH_X, finishReach)
+      ? Phaser.Math.Linear(heroBaseX, FINISH_HERO_REACH_X, finishReach) + celebrationFloatX
       : heroBaseX;
     const heroDisplayY = this.finishResolved
-      ? Phaser.Math.Linear(heroBaseY, FINISH_HERO_REACH_Y - victoryBounce * 0.35, finishReach)
+      ? Phaser.Math.Linear(heroBaseY, FINISH_HERO_REACH_Y - victoryBounce * 0.35, finishReach) + celebrationFloatY
       : heroBaseY;
 
     this.hero.setPosition(heroDisplayX, heroDisplayY).setScale(this.heroRenderScaleX, this.heroRenderScaleY);
@@ -620,7 +697,9 @@ export class JourneyScene extends Phaser.Scene {
         liftTilt +
         this.feedback.chain * 0.02 +
         this.feedback.impact * 0.08 +
-        this.sharkBurst * 0.05,
+        this.sharkBurst * 0.05 +
+        finishFloatProgress * 0.04 +
+        Math.sin(time * 0.0031) * 0.018 * finishFloatProgress,
       0.18
     );
 
@@ -643,13 +722,17 @@ export class JourneyScene extends Phaser.Scene {
       );
 
     this.heroShadow
-      .setPosition(this.hero.x - 6, runnerConfig.visual.groundLineY + 8)
-      .setFillStyle(renderMood.shadowColor, renderMood.shadowAlpha + this.feedback.impact * 0.06)
+      .setPosition(this.hero.x - 6, runnerConfig.visual.groundLineY + 7)
+      .setFillStyle(
+        renderMood.shadowColor,
+        renderMood.shadowAlpha + this.feedback.impact * 0.06 - finishFloatProgress * 0.08
+      )
       .setScale(
         renderMood.shadowScaleX +
           this.feedback.impact * 0.18 -
           Phaser.Math.Clamp((runnerConfig.hero.runY - loopSnapshot.heroY) / 180, 0, 0.22) +
-          landingSquash * 0.2,
+          landingSquash * 0.2 -
+          finishFloatProgress * 0.12,
         1
       );
 
@@ -1023,12 +1106,14 @@ export class JourneyScene extends Phaser.Scene {
       const startX = conduitOffset + index * 86;
       const offset = index % 2 === 0 ? 12 : -12;
 
-      this.backdrop.beginPath();
-      this.backdrop.moveTo(startX, -10);
-      this.backdrop.lineTo(startX + 16, 72);
-      this.backdrop.lineTo(startX - offset, 144);
-      this.backdrop.lineTo(startX + 10, 220);
-      this.backdrop.strokePath();
+      if (startX > 92) {
+        this.backdrop.beginPath();
+        this.backdrop.moveTo(startX, -10);
+        this.backdrop.lineTo(startX + 16, 72);
+        this.backdrop.lineTo(startX - offset, 144);
+        this.backdrop.lineTo(startX + 10, 220);
+        this.backdrop.strokePath();
+      }
 
       this.backdrop.beginPath();
       this.backdrop.moveTo(startX + 28, floorY - 14);
@@ -1161,6 +1246,12 @@ export class JourneyScene extends Phaser.Scene {
   }
 
   private handleShutdown() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mateo:pause-request', this.handlePauseRequest as EventListener);
+      window.removeEventListener('keydown', this.handlePauseKeyDown);
+    }
+
+    this.closePauseFlow(false);
     this.hideDiscoveryStage();
     this.emitVictoryState(false);
     this.emitFocusMode(false);
@@ -1168,7 +1259,168 @@ export class JourneyScene extends Phaser.Scene {
     this.runnerLoop?.destroy();
   }
 
+  private canPause() {
+    return !this.failResolved && !this.finishResolved && !this.returnHomeQueued;
+  }
+
+  private togglePauseStage() {
+    if (!this.sys.isActive()) {
+      return;
+    }
+
+    if (this.pauseOpen) {
+      this.closePauseFlow(true);
+      return;
+    }
+
+    if (!this.canPause() || this.activeDiscoveryBeatId) {
+      return;
+    }
+
+    this.openPauseStage();
+  }
+
+  private openPauseStage() {
+    if (this.pauseOpen || !this.canPause()) {
+      return;
+    }
+
+    this.pauseOpen = true;
+    this.helpOpen = false;
+    this.runnerLoop.setFrozen(true);
+    this.emitFocusMode(true);
+    this.pauseOverlay.setVisible(true).setAlpha(0.001).setInteractive();
+    this.pauseStage.setVisible(true).setAlpha(0).setScale(0.92);
+    this.helpStage.setVisible(false).setAlpha(0).setScale(0.92);
+    this.children.bringToTop(this.pauseOverlay);
+    this.children.bringToTop(this.pauseStage);
+    this.tweens.killTweensOf(this.pauseOverlay);
+    this.tweens.killTweensOf(this.pauseStage);
+    this.tweens.killTweensOf(this.helpStage);
+    this.tweens.add({
+      targets: this.pauseOverlay,
+      alpha: 0.28,
+      duration: 150,
+      ease: 'Quad.easeOut'
+    });
+    this.tweens.add({
+      targets: this.pauseStage,
+      alpha: 0.98,
+      scaleX: 0.98,
+      scaleY: 0.98,
+      duration: 180,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  private closePauseFlow(restoreRun: boolean) {
+    if (!this.pauseOpen && !this.helpOpen) {
+      return;
+    }
+
+    this.pauseOpen = false;
+    this.helpOpen = false;
+    this.tweens.killTweensOf(this.pauseOverlay);
+    this.tweens.killTweensOf(this.pauseStage);
+    this.tweens.killTweensOf(this.helpStage);
+    this.tweens.add({
+      targets: this.pauseOverlay,
+      alpha: 0,
+      duration: 110,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.pauseOverlay.disableInteractive();
+        this.pauseOverlay.setVisible(false);
+      }
+    });
+    this.tweens.add({
+      targets: [this.pauseStage, this.helpStage],
+      alpha: 0,
+      scaleX: 0.92,
+      scaleY: 0.92,
+      duration: 130,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.pauseStage.setVisible(false);
+        this.helpStage.setVisible(false);
+      }
+    });
+
+    if (restoreRun && !this.failResolved && !this.finishResolved && !this.activeDiscoveryBeatId) {
+      this.runnerLoop.setFrozen(false);
+      this.emitFocusMode(false);
+    }
+  }
+
+  private openPauseHelp() {
+    if (!this.pauseOpen || this.helpOpen) {
+      return;
+    }
+
+    this.helpOpen = true;
+    this.helpStage.setVisible(true).setAlpha(0).setScale(0.92);
+    this.children.bringToTop(this.helpStage);
+    this.tweens.killTweensOf(this.pauseStage);
+    this.tweens.killTweensOf(this.helpStage);
+    this.tweens.add({
+      targets: this.pauseStage,
+      alpha: 0,
+      scaleX: 0.92,
+      scaleY: 0.92,
+      duration: 110,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.pauseStage.setVisible(false);
+      }
+    });
+    this.tweens.add({
+      targets: this.helpStage,
+      alpha: 0.98,
+      scaleX: 0.98,
+      scaleY: 0.98,
+      duration: 170,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  private closePauseHelp() {
+    if (!this.pauseOpen || !this.helpOpen) {
+      return;
+    }
+
+    this.helpOpen = false;
+    this.pauseStage.setVisible(true).setAlpha(0).setScale(0.92);
+    this.children.bringToTop(this.pauseStage);
+    this.tweens.killTweensOf(this.pauseStage);
+    this.tweens.killTweensOf(this.helpStage);
+    this.tweens.add({
+      targets: this.helpStage,
+      alpha: 0,
+      scaleX: 0.92,
+      scaleY: 0.92,
+      duration: 110,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.helpStage.setVisible(false);
+      }
+    });
+    this.tweens.add({
+      targets: this.pauseStage,
+      alpha: 0.98,
+      scaleX: 0.98,
+      scaleY: 0.98,
+      duration: 170,
+      ease: 'Back.easeOut'
+    });
+  }
+
   private createIngredient(x: number, y: number) {
+    return this.stage.backdropKind === 'moonlight-mountain'
+      ? this.createMoonlightIngredient(x, y)
+      : this.createWoundedIngredient(x, y);
+  }
+
+  private createWoundedIngredient(x: number, y: number) {
     const trebleGlyph = '\uD834\uDD1E';
     const halo = this.add
       .ellipse(0, 0, 104, 104, 0xeaffc9, 0.18)
@@ -1257,6 +1509,86 @@ export class JourneyScene extends Phaser.Scene {
       .setAlpha(0);
   }
 
+  private createMoonlightIngredient(x: number, y: number) {
+    const halo = this.add
+      .ellipse(0, 0, 112, 112, 0xd7f5ff, 0.18)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const haloCore = this.add
+      .ellipse(0, 0, 74, 74, 0xf7fdff, 0.18)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const glassAura = this.add
+      .ellipse(0, 4, 78, 94, 0xbbe9ff, 0.16)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const outerRing = this.add
+      .ellipse(0, 4, 62, 78, 0xf6fdff, 0.12)
+      .setStrokeStyle(3, 0x69859a, 0.2);
+
+    const prismFrame = this.add.graphics();
+    const prismPoints = [
+      new Phaser.Geom.Point(0, -36),
+      new Phaser.Geom.Point(28, -4),
+      new Phaser.Geom.Point(0, 38),
+      new Phaser.Geom.Point(-28, -4)
+    ];
+    prismFrame.fillStyle(0xf7fdff, 0.94);
+    prismFrame.fillPoints(prismPoints, true);
+    prismFrame.lineStyle(3, 0x69859a, 0.22);
+    prismFrame.strokePoints(prismPoints, true, true);
+    prismFrame.lineStyle(2, 0xffffff, 0.16);
+    prismFrame.strokeLineShape(new Phaser.Geom.Line(0, -34, 0, 30));
+    prismFrame.strokeLineShape(new Phaser.Geom.Line(-20, 0, 0, -34));
+    prismFrame.strokeLineShape(new Phaser.Geom.Line(20, 0, 0, -34));
+    prismFrame.strokeLineShape(new Phaser.Geom.Line(-20, 0, 0, 30));
+    prismFrame.strokeLineShape(new Phaser.Geom.Line(20, 0, 0, 30));
+
+    const facetLeft = this.add
+      .triangle(-8, 1, -15, -7, 0, -30, -2, 22, 0xd7f4ff, 0.72)
+      .setStrokeStyle(2, 0x6f8ca0, 0.18);
+    const facetRight = this.add
+      .triangle(8, -1, 2, -30, 15, -7, 2, 22, 0xe6fbff, 0.68)
+      .setStrokeStyle(2, 0x6f8ca0, 0.18);
+    const facetBase = this.add
+      .triangle(0, 18, -14, -3, 0, 18, 14, -3, 0xb8dbff, 0.74)
+      .setStrokeStyle(2, 0x6f8ca0, 0.14);
+
+    const crescentGlow = this.add
+      .ellipse(-14, -18, 30, 30, 0xf7fdff, 0.92)
+      .setStrokeStyle(2, 0xa2c8d8, 0.2);
+    const crescentCut = this.add.ellipse(-8, -18, 25, 25, 0x0c1320, 0.82);
+    const prismStarGlow = this.add
+      .ellipse(20, -22, 22, 22, 0xf7fdff, 0.12)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const prismStar = this.add.star(20, -22, 4, 3, 10, 0xffffff, 0.92).setAngle(45);
+    const lowerSeed = this.add
+      .ellipse(1, 22, 10, 16, 0xbfe9ff, 0.88)
+      .setStrokeStyle(2, 0x53718a, 0.18);
+    const shimmerA = this.add.ellipse(26, 18, 4, 4, 0xf8ffff, 0.46);
+    const shimmerB = this.add.ellipse(-24, 28, 3, 3, 0xe8fbff, 0.34);
+    const shimmerC = this.add.ellipse(-20, -28, 3, 3, 0xf8ffff, 0.36);
+
+    return this.add
+      .container(x, y, [
+        halo,
+        haloCore,
+        glassAura,
+        outerRing,
+        prismFrame,
+        facetLeft,
+        facetRight,
+        facetBase,
+        crescentGlow,
+        crescentCut,
+        prismStarGlow,
+        prismStar,
+        lowerSeed,
+        shimmerA,
+        shimmerB,
+        shimmerC
+      ])
+      .setDepth(6.35)
+      .setAlpha(0);
+  }
+
   private createHitReaction() {
     const bubble = this.add.graphics();
     bubble.fillStyle(0x121920, 0.96);
@@ -1298,7 +1630,6 @@ export class JourneyScene extends Phaser.Scene {
   }
 
   private createShark() {
-    const shadow = this.add.ellipse(2, 24, 72, 18, 0x081018, 0.16);
     const glow = this.add
       .ellipse(0, 2, 92, 66, 0xd9f1dc, 0.032)
       .setBlendMode(Phaser.BlendModes.ADD);
@@ -1308,7 +1639,7 @@ export class JourneyScene extends Phaser.Scene {
       .setAlpha(0.94)
       .setTint(0xe5ece7);
 
-    return this.add.container(-120, 210, [shadow, glow, shark]).setDepth(4.9).setVisible(false);
+    return this.add.container(-120, 210, [glow, shark]).setDepth(4.9).setVisible(false);
   }
 
   private emitLightMotes(
@@ -1685,14 +2016,178 @@ export class JourneyScene extends Phaser.Scene {
     };
   }
 
+  private createPauseStage(x: number, y: number) {
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0b1117, 0.96);
+    panel.lineStyle(2, 0xdce9d6, 0.1);
+    panel.fillRoundedRect(-122, -92, 244, 206, 22);
+    panel.strokeRoundedRect(-122, -92, 244, 206, 22);
+    panel.lineStyle(1, 0xf7fff0, 0.024);
+    panel.strokeRoundedRect(-114, -84, 228, 190, 18);
+    panel.fillStyle(0xf1ffbe, 0.026);
+    panel.fillEllipse(0, -48, 88, 24);
+
+    const title = this.add
+      .text(0, -48, PAUSE_TITLE, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '20px',
+        color: '#f2ffbe',
+        stroke: '#081018',
+        strokeThickness: 2,
+        align: 'center'
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setShadow(0, 1, '#03060a', 3, false, true);
+    const body = this.add
+      .text(0, -8, PAUSE_BODY, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '13px',
+        color: '#fff7ec',
+        stroke: '#091018',
+        strokeThickness: 1,
+        align: 'center',
+        wordWrap: { width: 188, useAdvancedWrap: true },
+        lineSpacing: 3
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setShadow(0, 1, '#04070b', 2, false, true);
+    const closing = this.add
+      .text(0, 28, PAUSE_CLOSING, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '12px',
+        color: '#cfe8d9',
+        stroke: '#091018',
+        strokeThickness: 1,
+        align: 'center'
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setShadow(0, 1, '#04070b', 2, false, true);
+    const continueButton = this.createPanelButton(
+      CONTINUE_BUTTON_LABEL,
+      104,
+      () => this.closePauseFlow(true),
+      '11px'
+    );
+    const helpButton = this.createPanelButton(HELP_BUTTON_LABEL, 98, () => this.openPauseHelp(), '11px');
+    const replayButton = this.createPanelButton(
+      REPLAY_BUTTON_LABEL,
+      98,
+      () => {
+        this.closePauseFlow(false);
+        this.replayCurrentStage();
+      },
+      '11px'
+    );
+    const homeButton = this.createPanelButton(
+      HOME_BUTTON_LABEL,
+      108,
+      () => {
+        this.closePauseFlow(false);
+        this.returnToStart();
+      },
+      '11px'
+    );
+
+    continueButton.setPosition(-56, 76);
+    helpButton.setPosition(56, 76);
+    replayButton.setPosition(-56, 116);
+    homeButton.setPosition(56, 116);
+
+    return this.add
+      .container(x, y, [panel, title, body, closing, continueButton, helpButton, replayButton, homeButton])
+      .setDepth(6.72)
+      .setAlpha(0)
+      .setScale(0.92)
+      .setVisible(false);
+  }
+
+  private createHelpStage(x: number, y: number) {
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0b1117, 0.96);
+    panel.lineStyle(2, 0xdce9d6, 0.1);
+    panel.fillRoundedRect(-122, -106, 244, 226, 22);
+    panel.strokeRoundedRect(-122, -106, 244, 226, 22);
+    panel.lineStyle(1, 0xf7fff0, 0.024);
+    panel.strokeRoundedRect(-114, -98, 228, 210, 18);
+    panel.fillStyle(0xf1ffbe, 0.026);
+    panel.fillEllipse(0, -62, 96, 24);
+
+    const title = this.add
+      .text(0, -62, quickHelpContent.title, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '18px',
+        color: '#f2ffbe',
+        stroke: '#081018',
+        strokeThickness: 2,
+        align: 'center'
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setShadow(0, 1, '#03060a', 3, false, true);
+    const lead = this.add
+      .text(0, -24, quickHelpContent.lead, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '13px',
+        color: '#fff8ef',
+        stroke: '#091018',
+        strokeThickness: 1,
+        align: 'center',
+        wordWrap: { width: 188, useAdvancedWrap: true },
+        lineSpacing: 3
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setShadow(0, 1, '#04070b', 2, false, true);
+    const lineA = this.add
+      .text(0, 16, quickHelpContent.lines[0], {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '12px',
+        color: '#d9e2e8',
+        align: 'center',
+        wordWrap: { width: 194, useAdvancedWrap: true },
+        lineSpacing: 3
+      })
+      .setOrigin(0.5)
+      .setResolution(2);
+    const lineB = this.add
+      .text(0, 54, `${quickHelpContent.lines[1]} ${quickHelpContent.lines[2]}`, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '12px',
+        color: '#d9e2e8',
+        align: 'center',
+        wordWrap: { width: 194, useAdvancedWrap: true },
+        lineSpacing: 3
+      })
+      .setOrigin(0.5)
+      .setResolution(2);
+    const backButton = this.createPanelButton(
+      quickHelpContent.back,
+      118,
+      () => this.closePauseHelp(),
+      '11px'
+    );
+
+    backButton.setPosition(0, 104);
+
+    return this.add
+      .container(x, y, [panel, title, lead, lineA, lineB, backButton])
+      .setDepth(6.73)
+      .setAlpha(0)
+      .setScale(0.92)
+      .setVisible(false);
+  }
+
   private createFailStage(x: number, y: number) {
     const panel = this.add.graphics();
     panel.fillStyle(0x10151d, 0.96);
     panel.lineStyle(2, 0xdce9d6, 0.1);
-    panel.fillRoundedRect(-118, -74, 236, 160, 20);
-    panel.strokeRoundedRect(-118, -74, 236, 160, 20);
+    panel.fillRoundedRect(-118, -80, 236, 176, 20);
+    panel.strokeRoundedRect(-118, -80, 236, 176, 20);
     panel.lineStyle(1, 0xf7fff0, 0.018);
-    panel.strokeRoundedRect(-110, -66, 220, 144, 16);
+    panel.strokeRoundedRect(-110, -72, 220, 160, 16);
     panel.fillStyle(0xf1ffbe, 0.024);
     panel.fillEllipse(0, -28, 72, 20);
     panel.fillStyle(0xd8f4df, 0.03);
@@ -1737,16 +2232,28 @@ export class JourneyScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setResolution(2)
       .setShadow(0, 1, '#04070b', 2, false, true);
-    const button = this.createPanelButton(HOME_BUTTON_LABEL, 136, () => this.returnToStart());
+    const replayButton = this.createPanelButton(
+      REPLAY_BUTTON_LABEL,
+      98,
+      () => this.triggerRestartFromFailure(),
+      '11px'
+    );
+    const homeButton = this.createPanelButton(
+      HOME_BUTTON_LABEL,
+      108,
+      () => this.returnToStart(),
+      '11px'
+    );
 
-    button.setPosition(0, 74);
+    replayButton.setPosition(-56, 82);
+    homeButton.setPosition(56, 82);
 
     return this.add
-      .container(x, y, [panel, title, body, closing, button])
+      .container(x, y, [panel, title, body, closing, replayButton, homeButton])
       .setDepth(6.62)
       .setAlpha(0)
       .setScale(0.92)
-      .setSize(236, 160);
+      .setSize(236, 176);
   }
 
   private updateFinishObjects(time: number, loopSnapshot: RunnerLoopSnapshot) {
@@ -1758,17 +2265,28 @@ export class JourneyScene extends Phaser.Scene {
       return;
     }
 
-    const exitX = journeyConfig.logicalSize.width - 44 + loopSnapshot.finishRevealProgress * 6;
-    const exitY = 190 - loopSnapshot.surfaceProgress * 28;
     const hover = Math.sin(time * 0.0042) * 3.6;
     const sequenceEase = Phaser.Math.Easing.Cubic.Out(this.finishSequence);
     const sequenceBack = Phaser.Math.Easing.Back.Out(this.finishSequence);
-    const rewardReveal = this.finishResolved
-      ? Phaser.Math.Easing.Cubic.Out(Phaser.Math.Clamp(this.finishSequence / 0.28, 0, 1))
+    const previewTravel = Phaser.Math.Easing.Sine.Out(loopSnapshot.finishRevealProgress);
+    const ingredientFade = this.finishResolved
+      ? Phaser.Math.Easing.Cubic.In(
+          Phaser.Math.Clamp((this.finishSequence - (FINISH_CONTACT_BEAT_AT + 0.02)) / 0.18, 0, 1)
+        )
       : 0;
-    const previewAlpha = this.finishResolved
-      ? Phaser.Math.Linear(this.ingredient.alpha, 0, 0.18)
+    const rewardReveal = this.finishResolved
+      ? Phaser.Math.Easing.Cubic.Out(
+          Phaser.Math.Clamp((this.finishSequence - FINISH_CONTACT_BEAT_AT) / 0.24, 0, 1)
+        )
+      : 0;
+    const ingredientAlphaTarget = this.finishResolved
+      ? 0.98 * (1 - ingredientFade)
       : Math.max(loopSnapshot.finishRevealProgress, 0);
+    const nextIngredientAlpha = Phaser.Math.Linear(
+      this.ingredient.alpha,
+      ingredientAlphaTarget,
+      this.finishResolved ? 0.16 : 0.2
+    );
     const stageAlphaTarget =
       this.finishResolved && !this.continueResolved && this.finishSequence >= FINISH_PANEL_REVEAL_AT
         ? 0.98
@@ -1791,6 +2309,17 @@ export class JourneyScene extends Phaser.Scene {
     const rewardAlphaTarget = this.finishResolved ? 0.98 * rewardReveal : 0;
     const nextRewardAlpha = Phaser.Math.Linear(this.finishReward.alpha, rewardAlphaTarget, 0.14);
     const scrimTarget = this.finishResolved ? 0.08 : 0;
+    const rewardSourceX = Phaser.Math.Linear(FINISH_HERO_REACH_X + 28, FINISH_INGREDIENT_ZONE_X - 8, 0.58);
+    const rewardSourceY = Phaser.Math.Linear(FINISH_HERO_REACH_Y - 68, FINISH_INGREDIENT_ZONE_Y + 4, 0.56);
+    const ingredientX = this.finishResolved
+      ? Phaser.Math.Linear(this.ingredient.x, FINISH_INGREDIENT_ZONE_X, 0.18)
+      : Phaser.Math.Linear(journeyConfig.logicalSize.width + 34, FINISH_INGREDIENT_ZONE_X, previewTravel);
+    const ingredientY = this.finishResolved
+      ? Phaser.Math.Linear(this.ingredient.y, FINISH_INGREDIENT_ZONE_Y + hover * 0.34, 0.18)
+      : Phaser.Math.Linear(FINISH_INGREDIENT_ZONE_Y + 22, FINISH_INGREDIENT_ZONE_Y, previewTravel) + hover * 0.34;
+    const isMoonlight = this.stage.backdropKind === 'moonlight-mountain';
+    const rewardColor = isMoonlight ? 0xf4fcff : 0xf7ffec;
+    const rewardAccentColor = isMoonlight ? 0xc5efff : 0x9fffba;
 
     this.finishGlow
       .setPosition(
@@ -1813,15 +2342,15 @@ export class JourneyScene extends Phaser.Scene {
     this.finishScrim.setAlpha(Phaser.Math.Linear(this.finishScrim.alpha, scrimTarget, 0.08));
 
     this.ingredient
-      .setPosition(exitX, exitY + hover)
-      .setAlpha(previewAlpha)
-      .setScale(0.84 + loopSnapshot.finishRevealProgress * 0.14 + this.finishPulse * 0.08 + sequenceBack * 0.12)
+      .setPosition(ingredientX, ingredientY)
+      .setAlpha(nextIngredientAlpha)
+      .setScale(0.84 + loopSnapshot.finishRevealProgress * 0.14 + this.finishPulse * 0.06 + sequenceBack * 0.08)
       .setRotation(Math.sin(time * 0.0032) * 0.08 - loopSnapshot.finishRevealProgress * 0.04 + sequenceEase * 0.03);
 
     this.finishReward
       .setPosition(
-        FINISH_REWARD_ZONE_X,
-        Phaser.Math.Linear(FINISH_REWARD_ZONE_Y + 26, FINISH_REWARD_ZONE_Y, rewardReveal) +
+        Phaser.Math.Linear(rewardSourceX, FINISH_REWARD_ZONE_X, rewardReveal),
+        Phaser.Math.Linear(rewardSourceY, FINISH_REWARD_ZONE_Y, rewardReveal) +
           Math.sin(time * 0.0036) * (0.9 + rewardReveal * 1.1)
       )
       .setAlpha(nextRewardAlpha)
@@ -1833,19 +2362,25 @@ export class JourneyScene extends Phaser.Scene {
       !this.finishAwakeningBeatShown &&
       this.finishSequence >= FINISH_CONTACT_BEAT_AT
     ) {
-      const contactX = Phaser.Math.Linear(this.hero.x + 24, this.finishReward.x - 10, 0.5);
-      const contactY = Phaser.Math.Linear(this.hero.y - 66, this.finishReward.y + 10, 0.5);
+      const contactX = rewardSourceX;
+      const contactY = rewardSourceY;
       this.finishAwakeningBeatShown = true;
       this.finishPulse = Math.max(this.finishPulse, 1.28);
       audioCueBus.emit({
         type: 'awakening_touch',
         intensity: 1.14
       });
-      this.emitLightMotes(this.finishReward.x, this.finishReward.y, {
+      audioCueBus.emit({
+        type: 'victory_win',
+        intensity: 1.08
+      });
+      this.cameras.main.flash(110, isMoonlight ? 206 : 220, isMoonlight ? 242 : 255, isMoonlight ? 255 : 186, false);
+      this.cameras.main.zoomTo(1.06, 460, 'Cubic.easeOut');
+      this.emitLightMotes(this.ingredient.x, this.ingredient.y, {
         count: 10,
         spread: 48,
-        color: 0xf7ffec,
-        accentColor: 0x9fffba,
+        color: rewardColor,
+        accentColor: rewardAccentColor,
         durationMs: 700,
         depth: 5.58
       });
@@ -1853,9 +2388,31 @@ export class JourneyScene extends Phaser.Scene {
         count: 6,
         spread: 24,
         color: 0xfffdf1,
-        accentColor: 0xcaffb8,
+        accentColor: rewardAccentColor,
         durationMs: 520,
         depth: 5.54
+      });
+      this.emitLightMotes(this.hero.x + 6, this.hero.y - 42, {
+        count: 8,
+        spread: 32,
+        color: rewardColor,
+        accentColor: rewardAccentColor,
+        durationMs: 640,
+        depth: 5.56
+      });
+      this.time.delayedCall(180, () => {
+        if (!this.scene.isActive() || !this.finishResolved) {
+          return;
+        }
+
+        this.emitLightMotes(this.hero.x + 4, this.hero.y - 38, {
+          count: 5,
+          spread: 24,
+          color: 0xfffdf1,
+          accentColor: rewardAccentColor,
+          durationMs: 520,
+          depth: 5.55
+        });
       });
     }
 
@@ -1884,11 +2441,37 @@ export class JourneyScene extends Phaser.Scene {
       .setPosition(this.failStage.x, Phaser.Math.Linear(this.failStage.y, targetY, 0.16));
   }
 
+  private tryMoonlightOpportunity() {
+    if (!this.moonlightOpportunityAvailable || this.stage.backdropKind !== 'moonlight-mountain') {
+      return false;
+    }
+
+    const recovered = this.runnerLoop.recoverFromFailure(MOONLIGHT_OPPORTUNITY_PULSE);
+
+    if (!recovered) {
+      return false;
+    }
+
+    this.moonlightOpportunityAvailable = false;
+    this.feedback.collect = Math.max(this.feedback.collect, 0.28);
+    this.feedback.awakening = Math.max(this.feedback.awakening, 0.2);
+    this.hitReactionTimer = 0;
+    this.hitPoseLockTimer = 0;
+    this.emitGuidanceLine(MOONLIGHT_OPPORTUNITY_LINE, 2100, this.time.now);
+    this.cameras.main.flash(110, 206, 242, 255, false);
+    audioCueBus.emit({
+      type: 'awakening_touch',
+      intensity: 0.88
+    });
+    return true;
+  }
+
   private beginVictoryBeat() {
     if (this.finishResolved) {
       return;
     }
 
+    this.closePauseFlow(false);
     this.finishResolved = true;
     this.continueResolved = false;
     this.finishPulse = 1;
@@ -1904,15 +2487,10 @@ export class JourneyScene extends Phaser.Scene {
       this.victoryFrozen = true;
     }
 
+    this.children.bringToTop(this.ingredient);
     this.children.bringToTop(this.finishReward);
     this.children.bringToTop(this.finishStage);
 
-    audioCueBus.emit({
-      type: 'victory_win',
-      intensity: 1.1
-    });
-    this.cameras.main.flash(100, 220, 255, 186, false);
-    this.cameras.main.zoomTo(1.06, 600, 'Cubic.easeOut');
   }
 
   private beginFailureBeat() {
@@ -1920,6 +2498,7 @@ export class JourneyScene extends Phaser.Scene {
       return;
     }
 
+    this.closePauseFlow(false);
     this.failResolved = true;
     this.restartQueued = false;
     this.hitReactionTimer = 0;
@@ -2109,6 +2688,7 @@ export class JourneyScene extends Phaser.Scene {
     }
 
     this.returnHomeQueued = true;
+    this.closePauseFlow(false);
     this.emitFocusMode(false);
     this.emitVictoryState(false);
     sessionState.hydrate({
@@ -2116,15 +2696,8 @@ export class JourneyScene extends Phaser.Scene {
       collectedSparks: 0
     });
     localProgressStore.clear();
-    discoverySessionCache = null;
 
     if (typeof window !== 'undefined') {
-      try {
-        window.sessionStorage.removeItem(DISCOVERY_SESSION_STORAGE_KEY);
-      } catch {
-        // Ignore storage failures and keep the hard reload path.
-      }
-
       window.location.reload();
     }
   }
@@ -2135,13 +2708,17 @@ export class JourneyScene extends Phaser.Scene {
     }
 
     if (this.stage.nextStage) {
+      const nextStageKey = this.stage.nextStage;
       this.continueResolved = true;
       this.emitFocusMode(false);
       this.emitVictoryState(false);
+      this.emitUiScreen('chapter');
       this.cameras.main.fadeOut(220, 9, 16, 26);
       this.time.delayedCall(220, () => {
         sessionState.restartRun();
-        this.scene.restart({ stage: this.stage.nextStage ?? this.stageKey });
+        this.scene.start(this.scene.manager.keys['level-entry'] ? 'level-entry' : 'journey', {
+          stage: nextStageKey
+        });
       });
       return;
     }
@@ -2182,6 +2759,20 @@ export class JourneyScene extends Phaser.Scene {
       new CustomEvent('mateo:victory-state', {
         detail: {
           active
+        }
+      })
+    );
+  }
+
+  private emitUiScreen(screen: 'playing' | 'chapter') {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('mateo:ui-screen', {
+        detail: {
+          screen
         }
       })
     );
@@ -2381,6 +2972,16 @@ export class JourneyScene extends Phaser.Scene {
     ) {
       this.reserveGuidanceShown = true;
       this.triggerDiscoveryBeat('reserve_hint', time);
+    }
+
+    if (
+      phraseChanged &&
+      !this.upperRouteHintShown &&
+      loopSnapshot.currentPhraseId === 'onboarding_upper' &&
+      time - this.lastGuidanceAt > 2200
+    ) {
+      this.upperRouteHintShown = true;
+      this.triggerDiscoveryBeat('upper_route_intro', time);
     }
 
     if (

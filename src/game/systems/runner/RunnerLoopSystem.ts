@@ -5,6 +5,7 @@ import { runnerConfig } from '@/game/content/runnerConfig';
 import {
   type CollectibleVariant,
   type HazardVariant,
+  type PlatformVariant,
   type PhraseFamily,
   type RunnerPhrase,
   type RunnerPhraseItem
@@ -19,7 +20,7 @@ type PaintableShape =
   | Phaser.GameObjects.Ellipse
   | Phaser.GameObjects.Triangle;
 
-type LaneEntityRole = 'collectible' | 'hazard';
+type LaneEntityRole = 'collectible' | 'hazard' | 'platform';
 
 interface EntityDefinition {
   label: string;
@@ -34,7 +35,7 @@ interface EntityDefinition {
 interface RunnerEntity {
   label: string;
   role: LaneEntityRole;
-  variant: CollectibleVariant | HazardVariant;
+  variant: CollectibleVariant | HazardVariant | PlatformVariant;
   worldX: number;
   baseY: number;
   screenX: number;
@@ -43,6 +44,8 @@ interface RunnerEntity {
   height: number;
   hitboxOffsetX: number;
   hitboxOffsetY: number;
+  supportInsetX?: number;
+  supportOffsetY?: number;
   container: Phaser.GameObjects.Container;
   halo?: Phaser.GameObjects.Ellipse;
   primary: PaintableShape[];
@@ -104,13 +107,16 @@ const hazardDefinitions: Record<HazardVariant, EntityDefinition> = {
 } as const;
 
 const collectRadiusSquared = runnerConfig.rewards.collectRadius * runnerConfig.rewards.collectRadius;
+const HERO_SUPPORT_OFFSET_PX = runnerConfig.visual.groundLineY - runnerConfig.hero.runY;
+const PLATFORM_SUPPORT_SNAP_PX = 16;
+const PLATFORM_SUPPORT_CARRY_PX = 12;
 
 export class RunnerLoopSystem {
   private readonly entities: RunnerEntity[] = [];
   private readonly heroBoundsRect = new Phaser.Geom.Rectangle();
   private readonly entityBoundsRect = new Phaser.Geom.Rectangle();
 
-  private heroY = runnerConfig.hero.runY;
+  private heroY: number = runnerConfig.hero.runY;
   private heroVelocityY = 0;
   private frozen = false;
   private grounded = true;
@@ -258,6 +264,26 @@ export class RunnerLoopSystem {
     }
   }
 
+  recoverFromFailure(pulseRestore: number) {
+    if (!this.failed) {
+      return false;
+    }
+
+    this.failed = false;
+    this.frozen = false;
+    this.pointerHeld = false;
+    this.jumpBufferSeconds = 0;
+    this.holdJumpSeconds = 0;
+    this.staggerSeconds = Math.max(this.staggerSeconds, runnerConfig.obstacle.staggerSeconds * 0.9);
+    this.invulnerabilitySeconds = Math.max(
+      this.invulnerabilitySeconds,
+      runnerConfig.obstacle.invulnerabilitySeconds + 0.3
+    );
+    this.recoveryQueued = true;
+    sessionState.pulse(pulseRestore);
+    return true;
+  }
+
   private bindInput() {
     this.scene.input.on('pointerdown', this.handlePointerDown, this);
     this.scene.input.on('pointerup', this.handlePointerUp, this);
@@ -281,6 +307,7 @@ export class RunnerLoopSystem {
 
   private updateHeroPhysics(deltaSeconds: number) {
     const wasGrounded = this.grounded;
+    const previousHeroY = this.heroY;
     const previousVelocityY = this.heroVelocityY;
 
     this.staggerSeconds = Math.max(0, this.staggerSeconds - deltaSeconds);
@@ -311,6 +338,24 @@ export class RunnerLoopSystem {
       this.heroVelocityY + gravity * deltaSeconds
     );
     this.heroY += this.heroVelocityY * deltaSeconds;
+
+    const platformSupportY = this.findPlatformSupportY(previousHeroY);
+
+    if (platformSupportY !== null && this.heroY >= platformSupportY) {
+      this.heroY = platformSupportY;
+
+      if (!wasGrounded && previousVelocityY > runnerConfig.jump.landingBurstVelocity) {
+        this.landingBurst = Math.max(
+          this.landingBurst,
+          Phaser.Math.Clamp(previousVelocityY / runnerConfig.jump.maxFallSpeed, 0, 1)
+        );
+      }
+
+      this.heroVelocityY = 0;
+      this.grounded = true;
+      this.jumpsUsed = 0;
+      return;
+    }
 
     if (this.heroY >= runnerConfig.hero.runY) {
       this.heroY = runnerConfig.hero.runY;
@@ -347,9 +392,7 @@ export class RunnerLoopSystem {
     this.jumpBufferSeconds = 0;
     this.coyoteSeconds = 0;
     this.grounded = false;
-    this.heroVelocityY = isAirJump
-      ? -runnerConfig.jump.doubleJumpVelocity
-      : -runnerConfig.jump.velocity;
+    this.heroVelocityY = -this.getJumpVelocity(isAirJump);
     this.heroY -= isAirJump ? 1 : 2;
     this.holdJumpSeconds = isAirJump
       ? runnerConfig.jump.airJumpHoldMaxSeconds
@@ -358,7 +401,7 @@ export class RunnerLoopSystem {
 
     audioCueBus.emit({
       type: 'jump_player',
-      intensity: isAirJump ? 1.4 : 1.0
+      intensity: !isAirJump ? 1.0 : this.jumpsUsed >= 3 ? 1.56 : 1.4
     });
 
     if (isAirJump) {
@@ -421,9 +464,15 @@ export class RunnerLoopSystem {
   }
 
   private createEntity(worldX: number, item: RunnerPhraseItem, mood: MoodSnapshot): RunnerEntity {
-    return item.kind === 'collectible'
-      ? this.createCollectible(worldX, item.variant, item.y, mood)
-      : this.createHazard(worldX, item.variant, item.y, mood);
+    if (item.kind === 'collectible') {
+      return this.createCollectible(worldX, item.variant, item.y, mood);
+    }
+
+    if (item.kind === 'hazard') {
+      return this.createHazard(worldX, item.variant, item.y, mood);
+    }
+
+    return this.createPlatform(worldX, item.variant, item.y, item.width, mood);
   }
 
   private createCollectible(
@@ -640,6 +689,58 @@ export class RunnerLoopSystem {
     };
   }
 
+  private createPlatform(
+    worldX: number,
+    variant: PlatformVariant,
+    surfaceHeight: number,
+    width: number,
+    mood: MoodSnapshot
+  ): RunnerEntity {
+    const height = 18;
+    const container = this.scene.add.container(0, 0).setDepth(3.25);
+    const halo = this.scene.add
+      .ellipse(0, 2, width * 0.78, 22, mood.sparkColor, this.stage.backdropKind === 'moonlight-mountain' ? 0.1 : 0.06)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    const primary: PaintableShape[] = [
+      this.scene.add.ellipse(0, 18, width * 0.72, 10, 0x0a0d12, 0.18),
+      this.scene.add.rectangle(0, 0, width - 26, 14, 0x23323a, 1),
+      this.scene.add.ellipse(-(width * 0.5) + 13, 0, 26, 14, 0x2d3d47, 1),
+      this.scene.add.ellipse((width * 0.5) - 13, 0, 26, 14, 0x2d3d47, 1),
+      this.scene.add.rectangle(0, -4, width - 54, 4, 0xeef7da, 0.9),
+      this.scene.add.rectangle(-(width * 0.24), 12, 8, 12, 0x1a252b, 1),
+      this.scene.add.rectangle(width * 0.2, 11, 8, 10, 0x1a252b, 1)
+    ];
+    const secondary: PaintableShape[] = [
+      this.scene.add.rectangle(0, 2, width - 42, 3, 0xf8fff0, 0.56),
+      this.scene.add.ellipse(-(width * 0.28), -2, 10, 4, 0xffffff, 0.48),
+      this.scene.add.ellipse(width * 0.22, -1, 8, 4, 0xffffff, 0.42)
+    ];
+
+    container.add([halo, ...primary, ...secondary]);
+
+    return {
+      label: variant,
+      role: 'platform',
+      variant,
+      worldX,
+      baseY: runnerConfig.visual.groundLineY - surfaceHeight + height * 0.5,
+      screenX: 0,
+      screenY: 0,
+      width,
+      height,
+      hitboxOffsetX: 0,
+      hitboxOffsetY: 0,
+      supportInsetX: 20,
+      supportOffsetY: -height * 0.5,
+      container,
+      halo,
+      primary,
+      secondary,
+      inactive: false
+    };
+  }
+
   private updateEntities(time: number, mood: MoodSnapshot) {
     const heroBounds = this.getHeroBounds();
     const heroCenterY = this.heroY - 26;
@@ -651,7 +752,9 @@ export class RunnerLoopSystem {
       const wobble =
         entity.role === 'collectible'
           ? Math.sin(time * 0.0052 + entity.worldX * 0.02) * 4.4
-          : Math.sin(time * 0.0037 + entity.worldX * 0.01) * 1.4;
+          : entity.role === 'hazard'
+            ? Math.sin(time * 0.0037 + entity.worldX * 0.01) * 1.4
+            : 0;
       let shouldRemove = false;
 
       entity.screenX = screenX;
@@ -689,9 +792,11 @@ export class RunnerLoopSystem {
           entity.inactive = true;
           entity.container.setAlpha(0.68);
         }
+      } else {
+        this.paintPlatform(entity, mood, time);
       }
 
-      if (entity.screenX < -runnerConfig.spawn.removalMargin) {
+      if (entity.screenX < -runnerConfig.spawn.removalMargin - entity.width * 0.5) {
         shouldRemove = true;
       }
 
@@ -700,6 +805,60 @@ export class RunnerLoopSystem {
         this.entities.splice(index, 1);
       }
     }
+  }
+
+  private getJumpVelocity(isAirJump: boolean) {
+    if (!isAirJump) {
+      return runnerConfig.jump.velocity;
+    }
+
+    return this.jumpsUsed >= 2
+      ? runnerConfig.jump.thirdJumpVelocity
+      : runnerConfig.jump.doubleJumpVelocity;
+  }
+
+  private findPlatformSupportY(previousHeroY: number) {
+    const heroFootX = runnerConfig.hero.screenX + 4;
+    const previousFootY = previousHeroY + HERO_SUPPORT_OFFSET_PX;
+    const currentFootY = this.heroY + HERO_SUPPORT_OFFSET_PX;
+    let bestSupportY: number | null = null;
+
+    for (const entity of this.entities) {
+      if (entity.role !== 'platform') {
+        continue;
+      }
+
+      const inset = entity.supportInsetX ?? 0;
+      const left = entity.screenX - entity.width * 0.5 + inset;
+      const right = entity.screenX + entity.width * 0.5 - inset;
+
+      if (heroFootX < left || heroFootX > right) {
+        continue;
+      }
+
+      const topY = entity.screenY + (entity.supportOffsetY ?? -entity.height * 0.5);
+      const crossedTop =
+        this.heroVelocityY >= -12 &&
+        previousFootY <= topY + PLATFORM_SUPPORT_SNAP_PX &&
+        currentFootY >= topY - 1;
+      const stayingOnTop =
+        this.grounded &&
+        Math.abs(previousFootY - topY) <= PLATFORM_SUPPORT_CARRY_PX &&
+        currentFootY >= topY - 1 &&
+        currentFootY <= topY + PLATFORM_SUPPORT_CARRY_PX;
+
+      if (!crossedTop && !stayingOnTop) {
+        continue;
+      }
+
+      const supportHeroY = topY - HERO_SUPPORT_OFFSET_PX;
+
+      if (bestSupportY === null || supportHeroY < bestSupportY) {
+        bestSupportY = supportHeroY;
+      }
+    }
+
+    return bestSupportY;
   }
 
   private collectEntity(entity: RunnerEntity) {
@@ -890,6 +1049,55 @@ export class RunnerLoopSystem {
 
     this.paintShapes(entity.primary, mood.sparkColor, 0.98, mood.sparkEdgeColor, 0.3);
     this.paintShapes(entity.secondary, highlightColor, 0.96, mood.sparkEdgeColor, 0.1);
+  }
+
+  private paintPlatform(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
+    const isMoonlight = this.stage.backdropKind === 'moonlight-mountain';
+    const shimmer = Math.sin(time * 0.0024 + entity.worldX * 0.009) * 0.04;
+    const applyPaint = (
+      shape: PaintableShape | undefined,
+      fillColor: number,
+      fillAlpha: number,
+      strokeColor: number,
+      strokeAlpha: number,
+      strokeWidth = 2
+    ) => {
+      shape
+        ?.setAlpha(1)
+        .setFillStyle(fillColor, fillAlpha)
+        .setStrokeStyle(strokeWidth, strokeColor, strokeAlpha);
+    };
+
+    entity.container.setRotation(0).setScale(1 + shimmer * 0.04, 1);
+    entity.halo?.setFillStyle(
+      isMoonlight ? 0xcff4ff : mood.sparkColor,
+      (isMoonlight ? 0.12 : 0.08) + Math.abs(shimmer) * 0.05
+    );
+
+    if (isMoonlight) {
+      applyPaint(entity.primary[0], 0x07101b, 0.22, 0x02050a, 0.12, 1);
+      applyPaint(entity.primary[1], 0x5b7195, 0.98, 0x22314c, 0.72, 3);
+      applyPaint(entity.primary[2], 0x6f8bb0, 0.98, 0x2d4060, 0.72, 3);
+      applyPaint(entity.primary[3], 0x6f8bb0, 0.98, 0x2d4060, 0.72, 3);
+      applyPaint(entity.primary[4], 0xf2fbff, 0.84, 0xc9f3ff, 0.16, 1);
+      applyPaint(entity.primary[5], 0x25354d, 0.94, 0x101a26, 0.42, 2);
+      applyPaint(entity.primary[6], 0x25354d, 0.94, 0x101a26, 0.42, 2);
+      applyPaint(entity.secondary[0], 0xffffff, 0.36, 0xeafaff, 0.12, 1);
+      applyPaint(entity.secondary[1], 0xffffff, 0.54, 0xeafaff, 0.12, 1);
+      applyPaint(entity.secondary[2], 0xffffff, 0.48, 0xeafaff, 0.12, 1);
+      return;
+    }
+
+    applyPaint(entity.primary[0], 0x0a0e11, 0.18, 0x040608, 0.1, 1);
+    applyPaint(entity.primary[1], 0x365447, 0.98, 0x15251f, 0.68, 3);
+    applyPaint(entity.primary[2], 0x45685a, 0.98, 0x1b2e27, 0.68, 3);
+    applyPaint(entity.primary[3], 0x45685a, 0.98, 0x1b2e27, 0.68, 3);
+    applyPaint(entity.primary[4], 0xe8f3c8, 0.84, 0xbfd29f, 0.16, 1);
+    applyPaint(entity.primary[5], 0x223730, 0.94, 0x0f1714, 0.42, 2);
+    applyPaint(entity.primary[6], 0x223730, 0.94, 0x0f1714, 0.42, 2);
+    applyPaint(entity.secondary[0], 0xffffff, 0.28, 0xe8f6d6, 0.12, 1);
+    applyPaint(entity.secondary[1], 0xf6ffd8, 0.42, 0xe8f6d6, 0.12, 1);
+    applyPaint(entity.secondary[2], 0xf6ffd8, 0.38, 0xe8f6d6, 0.12, 1);
   }
 
   private paintHazard(entity: RunnerEntity, mood: MoodSnapshot, time: number) {

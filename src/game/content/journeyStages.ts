@@ -1,3 +1,5 @@
+import moonlightMountainFinalUrl from '@/assets/entry/moonlight-mountain-ok.jpg';
+import planetHomeCutoutUrl from '@/assets/planet/planet-home-cutout.webp';
 import { runnerConfig } from '@/game/content/runnerConfig';
 import {
   runnerPhrases,
@@ -27,11 +29,35 @@ export interface JourneyRunnerContent {
   level: JourneyLevelProfile;
 }
 
+export interface JourneyEntryScreen {
+  eyebrow: string;
+  title: string;
+  framing: string;
+  detail: string;
+  cta: string;
+  primaryColor: number;
+  accentColor: number;
+  art: {
+    textureKey: string;
+    imageUrl: string;
+    maxWidth: number;
+    maxHeight: number;
+    y: number;
+    rotation?: number;
+  };
+  loading: {
+    eyebrow: string;
+    title: string;
+    copy: string;
+  };
+}
+
 export interface JourneyStageDefinition {
   key: JourneyStageKey;
   label: string;
   backdropKind: JourneyBackdropKind;
   nextStage: JourneyStageKey | null;
+  entry: JourneyEntryScreen;
   introGuidance?: string;
   beatGuidance?: string;
   surfaceGuidance?: string;
@@ -89,16 +115,19 @@ const moonlightPhrases: RunnerPhraseMap = {
     id: 'moonlight_launch',
     label: 'Moonlight Launch',
     family: 'onboarding',
-    spacingAfter: 574,
+    spacingAfter: 596,
     items: [
       { kind: 'collectible', variant: 'spark', x: 88, y: 54 },
       { kind: 'hazard', variant: 'shard', x: 136, y: 18 },
       { kind: 'collectible', variant: 'note', x: 204, y: 84 },
       { kind: 'collectible', variant: 'brush', x: 248, y: 128 },
-      { kind: 'hazard', variant: 'mirror', x: 298, y: 170 },
-      { kind: 'collectible', variant: 'spark', x: 348, y: 190 },
-      { kind: 'collectible', variant: 'note', x: 408, y: 148 },
-      { kind: 'hazard', variant: 'crown', x: 470, y: 198 }
+      { kind: 'hazard', variant: 'mirror', x: 278, y: 146 },
+      { kind: 'platform', variant: 'ledge', x: 382, y: 190, width: 188 },
+      { kind: 'collectible', variant: 'spark', x: 334, y: 182 },
+      { kind: 'collectible', variant: 'note', x: 386, y: 214 },
+      { kind: 'collectible', variant: 'brush', x: 436, y: 196 },
+      { kind: 'hazard', variant: 'crown', x: 526, y: 204 },
+      { kind: 'collectible', variant: 'note', x: 566, y: 146 }
     ]
   },
   moonlight_shard_step: {
@@ -177,11 +206,14 @@ const moonlightPhrases: RunnerPhraseMap = {
       { kind: 'collectible', variant: 'spark', x: 166, y: 62 },
       { kind: 'collectible', variant: 'note', x: 208, y: 96 },
       { kind: 'collectible', variant: 'brush', x: 258, y: 136 },
-      { kind: 'hazard', variant: 'mirror', x: 314, y: 162 },
-      { kind: 'collectible', variant: 'spark', x: 370, y: 184 },
-      { kind: 'hazard', variant: 'crown', x: 430, y: 206 },
-      { kind: 'collectible', variant: 'note', x: 486, y: 150 },
-      { kind: 'collectible', variant: 'brush', x: 544, y: 112 }
+      { kind: 'hazard', variant: 'mirror', x: 268, y: 150 },
+      { kind: 'platform', variant: 'ledge', x: 404, y: 190, width: 190 },
+      { kind: 'collectible', variant: 'spark', x: 352, y: 178 },
+      { kind: 'collectible', variant: 'note', x: 406, y: 214 },
+      { kind: 'collectible', variant: 'brush', x: 452, y: 196 },
+      { kind: 'collectible', variant: 'note', x: 500, y: 160 },
+      { kind: 'hazard', variant: 'crown', x: 548, y: 204 },
+      { kind: 'collectible', variant: 'brush', x: 560, y: 118 }
     ]
   },
   moonlight_fork: {
@@ -254,6 +286,28 @@ export const journeyStages: Record<JourneyStageKey, JourneyStageDefinition> = {
     label: 'Wounded Planet',
     backdropKind: 'wounded-planet',
     nextStage: 'moonlight-mountain',
+    entry: {
+      eyebrow: 'Nivel 1',
+      title: 'Wounded Planet',
+      framing: 'Entra en el planeta herido.',
+      detail: 'Las notas abren camino.',
+      cta: 'Entrar',
+      primaryColor: 0x90e6b7,
+      accentColor: 0xe9ffaf,
+      art: {
+        textureKey: 'entry-art-wounded-planet',
+        imageUrl: planetHomeCutoutUrl,
+        maxWidth: 252,
+        maxHeight: 276,
+        y: 274,
+        rotation: -0.05
+      },
+      loading: {
+        eyebrow: 'Wounded Planet',
+        title: 'Abriendo el primer mundo...',
+        copy: 'El primer mundo ya está listo.'
+      }
+    },
     surfaceGuidance: 'La luz vuelve poco a poco.',
     runner: {
       phrases: runnerPhrases,
@@ -262,6 +316,7 @@ export const journeyStages: Record<JourneyStageKey, JourneyStageDefinition> = {
         'onboarding_jump',
         'onboarding_notes',
         'onboarding_double',
+        'onboarding_upper',
         'tension_step',
         'onboarding_reserve',
         'onboarding_shark'
@@ -276,6 +331,27 @@ export const journeyStages: Record<JourneyStageKey, JourneyStageDefinition> = {
     label: 'Moonlight Mountain',
     backdropKind: 'moonlight-mountain',
     nextStage: null,
+    entry: {
+      eyebrow: 'Nivel 2',
+      title: 'Moonlight Mountain',
+      framing: 'La montaña devuelve reflejos.',
+      detail: 'La ruta cambia con la luz.',
+      cta: 'Seguir',
+      primaryColor: 0x95c5d8,
+      accentColor: 0xcef2ff,
+      art: {
+        textureKey: 'entry-art-moonlight-mountain',
+        imageUrl: moonlightMountainFinalUrl,
+        maxWidth: 286,
+        maxHeight: 236,
+        y: 282
+      },
+      loading: {
+        eyebrow: 'Moonlight Mountain',
+        title: 'Preparando la segunda entrada...',
+        copy: 'La luz ya marca la ruta.'
+      }
+    },
     introGuidance: 'Todo refleja aquí.',
     beatGuidance: 'Brillan con cada nota.',
     surfaceGuidance: 'La luna abre camino.',
@@ -289,10 +365,10 @@ export const journeyStages: Record<JourneyStageKey, JourneyStageDefinition> = {
       ],
       rotation: [
         'moonlight_shard_step',
+        'moonlight_glass_ladder',
         'moonlight_mirror_arc',
         'moonlight_crown_cross',
         'moonlight_reflect_gate',
-        'moonlight_glass_ladder',
         'moonlight_fork',
         'moonlight_crescent'
       ],
