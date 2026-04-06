@@ -12,15 +12,15 @@ export const emotionPalette = {
     shadow: 0x120d11
   },
   alive: {
-    gradientTop: 0xd8f0c7,
-    gradientBottom: 0xff9f81,
-    haze: 0xd4e8c9,
-    floor: 0x708979,
-    line: 0x26675d,
-    aura: 0xf2ff93,
-    marker: 0xfffcf4,
-    spark: 0xf5ffbf,
-    sparkEdge: 0x2d4f27,
-    shadow: 0x583132
+    gradientTop: 0x96b2c9,
+    gradientBottom: 0xb8bfd1,
+    haze: 0xc0d8dc,
+    floor: 0x58707a,
+    line: 0x3b6676,
+    aura: 0xd8ffe3,
+    marker: 0xfbfcf6,
+    spark: 0xf0ffd0,
+    sparkEdge: 0x314840,
+    shadow: 0x36414a
   }
 } as const;

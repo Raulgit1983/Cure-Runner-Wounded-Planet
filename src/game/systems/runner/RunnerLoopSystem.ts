@@ -1,9 +1,8 @@
 import Phaser from 'phaser';
 
+import { journeyStages, type JourneyStageDefinition } from '@/game/content/journeyStages';
 import { runnerConfig } from '@/game/content/runnerConfig';
 import {
-  runnerPhrases,
-  runnerPhraseRotation,
   type CollectibleVariant,
   type HazardVariant,
   type PhraseFamily,
@@ -98,7 +97,10 @@ const collectibleDefinitions: Record<CollectibleVariant, EntityDefinition> = {
 const hazardDefinitions: Record<HazardVariant, EntityDefinition> = {
   sludge: { label: 'sludge', role: 'hazard', depth: 3.6, width: 34, height: 20, offsetX: -4, offsetY: -10 },
   warden: { label: 'warden', role: 'hazard', depth: 3.6, width: 30, height: 38, offsetX: 0, offsetY: -11 },
-  hound: { label: 'hound', role: 'hazard', depth: 3.6, width: 36, height: 20, offsetX: 3, offsetY: -12 }
+  hound: { label: 'hound', role: 'hazard', depth: 3.6, width: 36, height: 20, offsetX: 3, offsetY: -12 },
+  shard: { label: 'shard', role: 'hazard', depth: 3.72, width: 36, height: 22, offsetX: 0, offsetY: -12 },
+  mirror: { label: 'mirror', role: 'hazard', depth: 3.72, width: 28, height: 44, offsetX: 0, offsetY: -8 },
+  crown: { label: 'crown', role: 'hazard', depth: 3.72, width: 42, height: 26, offsetX: 0, offsetY: -14 }
 } as const;
 
 const collectRadiusSquared = runnerConfig.rewards.collectRadius * runnerConfig.rewards.collectRadius;
@@ -129,16 +131,24 @@ export class RunnerLoopSystem {
   private impactBurst = 0;
   private landingBurst = 0;
   private recoveryPhraseIndex = 0;
+  private lowPulseRecoveryStreak = 0;
+  private onboardingPhraseIndex = 0;
   private currentSpeed: number = runnerConfig.movement.baseSpeed;
-  private currentPhraseId: string = runnerPhrases.onboarding_intro.id;
-  private currentPhraseLabel: string = runnerPhrases.onboarding_intro.label;
-  private currentPhraseFamily: PhraseFamily = runnerPhrases.onboarding_intro.family;
+  private currentPhraseId = '';
+  private currentPhraseLabel = '';
+  private currentPhraseFamily: PhraseFamily = 'onboarding';
   private failed = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly showDebug = false
+    private readonly showDebug = false,
+    private readonly stage: JourneyStageDefinition = journeyStages['wounded-planet']
   ) {
+    const initialPhrase = this.stage.runner.phrases[this.stage.runner.initialPhraseId]!;
+
+    this.currentPhraseId = initialPhrase.id;
+    this.currentPhraseLabel = initialPhrase.label;
+    this.currentPhraseFamily = initialPhrase.family;
     this.bindInput();
   }
 
@@ -156,24 +166,25 @@ export class RunnerLoopSystem {
       runnerConfig.movement.baseSpeed *
       (1 + displayLevel * runnerConfig.movement.displaySpeedBonus) *
       (1 - this.getStaggerAmount() * runnerConfig.obstacle.speedPenalty);
-    const remainingDistance = runnerConfig.level.endDistance - this.distanceTravelled;
+    const level = this.stage.runner.level;
+    const remainingDistance = level.endDistance - this.distanceTravelled;
     const speed =
-      remainingDistance < runnerConfig.level.finishSlowdownDistance
+      remainingDistance < level.finishSlowdownDistance
         ? Phaser.Math.Linear(
             rawSpeed * 0.36,
             rawSpeed,
-            Phaser.Math.Clamp(remainingDistance / runnerConfig.level.finishSlowdownDistance, 0, 1)
+            Phaser.Math.Clamp(remainingDistance / level.finishSlowdownDistance, 0, 1)
           )
         : rawSpeed;
 
     this.currentSpeed = speed;
     this.distanceTravelled = Math.min(
-      runnerConfig.level.endDistance + runnerConfig.level.exitCoastDistance,
+      level.endDistance + level.exitCoastDistance,
       this.distanceTravelled + speed * deltaSeconds
     );
 
     while (
-      this.nextPhraseWorldX < runnerConfig.level.endDistance - 260 &&
+      this.nextPhraseWorldX < level.endDistance - 260 &&
       this.nextPhraseWorldX - this.distanceTravelled < runnerConfig.spawn.leadDistance
     ) {
       this.spawnPhrase(this.pickNextPhrase(sessionState.snapshot()), mood);
@@ -376,22 +387,37 @@ export class RunnerLoopSystem {
   }
 
   private pickNextPhrase(snapshot = sessionState.snapshot()) {
+    const runner = this.stage.runner;
+    const lowPulseNeedsBreather =
+      snapshot.currentPulse <= runnerConfig.director.recoveryPulseThreshold &&
+      this.lowPulseRecoveryStreak < 1;
+
     if (this.initialPhrasePending) {
       this.initialPhrasePending = false;
-      return runnerPhrases.onboarding_intro;
+      return runner.phrases[runner.initialPhraseId]!;
     }
 
-    if (this.recoveryQueued || snapshot.currentPulse <= runnerConfig.director.recoveryPulseThreshold) {
+    if (this.recoveryQueued || lowPulseNeedsBreather) {
       this.recoveryQueued = false;
-      const recoveryId = this.recoveryPhraseIndex % 2 === 0 ? 'recovery_breath' : 'recovery_lift';
+      this.lowPulseRecoveryStreak += 1;
+      const recoveryId =
+        runner.recoverySequence[this.recoveryPhraseIndex % runner.recoverySequence.length]!;
       this.recoveryPhraseIndex += 1;
-      return runnerPhrases[recoveryId];
+      return runner.phrases[recoveryId]!;
     }
 
-    const nextId = runnerPhraseRotation[this.rotationIndex % runnerPhraseRotation.length]!;
+    if (this.onboardingPhraseIndex < runner.onboardingSequence.length) {
+      this.lowPulseRecoveryStreak = 0;
+      const onboardingId = runner.onboardingSequence[this.onboardingPhraseIndex]!;
+      this.onboardingPhraseIndex += 1;
+      return runner.phrases[onboardingId]!;
+    }
+
+    this.lowPulseRecoveryStreak = 0;
+    const nextId = runner.rotation[this.rotationIndex % runner.rotation.length]!;
     this.rotationIndex += 1;
 
-    return runnerPhrases[nextId];
+    return runner.phrases[nextId]!;
   }
 
   private createEntity(worldX: number, item: RunnerPhraseItem, mood: MoodSnapshot): RunnerEntity {
@@ -547,6 +573,49 @@ export class RunnerLoopSystem {
         this.scene.add.ellipse(17, -1, 6, 6, 0xff7b72, 0.94),
         this.scene.add.triangle(-14, 2, -5, 8, 5, 8, -6, -3, 0xc9d0cf, 0.78),
         this.scene.add.rectangle(10, 11, 8, 2, 0xece0d6, 0.72).setRotation(-0.12)
+      );
+    }
+
+    if (variant === 'shard') {
+      primary.push(
+        this.scene.add.ellipse(0, 18, 40, 8, 0x081018, 0.22),
+        this.scene.add.triangle(-12, 6, -10, 10, 0, -18, 8, 10, 0x6da0b8, 1).setRotation(-0.08),
+        this.scene.add.triangle(2, 2, -10, 12, 0, -20, 10, 12, 0x95c5d8, 1),
+        this.scene.add.triangle(16, 7, -8, 10, 0, -16, 8, 12, 0x7db3c9, 1).setRotation(0.14)
+      );
+      secondary.push(
+        this.scene.add.triangle(-8, -2, -2, 10, 0, -14, 3, 8, 0xf8ffff, 0.88).setRotation(-0.08),
+        this.scene.add.triangle(5, -6, -3, 12, 0, -16, 4, 10, 0xf6ffff, 0.92),
+        this.scene.add.rectangle(12, -2, 3, 18, 0xe9fff8, 0.76).setRotation(0.14)
+      );
+    }
+
+    if (variant === 'mirror') {
+      primary.push(
+        this.scene.add.ellipse(0, 28, 34, 8, 0x081018, 0.2),
+        this.scene.add.triangle(-6, 6, -10, 18, 0, -22, 12, 16, 0x7fa7c0, 1).setRotation(-0.1),
+        this.scene.add.triangle(8, -2, -10, 20, 0, -22, 10, 20, 0xa9d3e4, 1).setRotation(0.08),
+        this.scene.add.rectangle(1, 6, 6, 34, 0x536f86, 1).setRotation(0.02)
+      );
+      secondary.push(
+        this.scene.add.rectangle(-3, 2, 4, 26, 0xf4ffff, 0.9).setRotation(-0.08),
+        this.scene.add.rectangle(8, 0, 3, 20, 0xeaffff, 0.72).setRotation(0.08),
+        this.scene.add.ellipse(4, -18, 4, 4, 0xfdffff, 0.84)
+      );
+    }
+
+    if (variant === 'crown') {
+      primary.push(
+        this.scene.add.ellipse(0, 18, 44, 8, 0x081018, 0.22),
+        this.scene.add.triangle(-14, 7, -10, 10, 0, -14, 8, 10, 0x7ba7bd, 1).setRotation(-0.14),
+        this.scene.add.triangle(0, 2, -10, 12, 0, -20, 10, 12, 0xa5d4e8, 1),
+        this.scene.add.triangle(14, 7, -8, 10, 0, -14, 10, 10, 0x89bdd1, 1).setRotation(0.14),
+        this.scene.add.triangle(-1, -6, -6, 10, 0, -12, 6, 10, 0x5a7a91, 1)
+      );
+      secondary.push(
+        this.scene.add.triangle(-10, -2, -4, 10, 0, -10, 3, 9, 0xf9ffff, 0.76).setRotation(-0.14),
+        this.scene.add.triangle(2, -8, -4, 12, 0, -14, 4, 12, 0xffffff, 0.9),
+        this.scene.add.triangle(11, -2, -3, 10, 0, -10, 4, 9, 0xf6ffff, 0.74).setRotation(0.14)
       );
     }
 
@@ -712,6 +781,15 @@ export class RunnerLoopSystem {
       amount: runnerConfig.obstacle.pulseLoss
     });
 
+    if (transition.after.recoveryChances < transition.before.recoveryChances) {
+      audioCueBus.emit({
+        type: 'reserve_spent',
+        intensity: 1,
+        chain: previous.currentChain,
+        amount: transition.before.recoveryChances - transition.after.recoveryChances
+      });
+    }
+
     if (shouldFail) {
       this.setFrozen(true);
     }
@@ -746,11 +824,14 @@ export class RunnerLoopSystem {
 
   private paintCollectible(entity: RunnerEntity, mood: MoodSnapshot, time: number) {
     const hoverScale = 1 + Math.sin(time * 0.005 + entity.worldX * 0.018) * 0.06;
-    const shellColor = 0xf0e7d7;
-    const shellWarm = 0xe2d3b3;
-    const shellStroke = 0x645d4f;
-    const mossAccent = 0xc7d8ab;
-    const highlightColor = 0xfff8ea;
+    const isMoonlight = this.stage.backdropKind === 'moonlight-mountain';
+    const shellColor = isMoonlight ? 0xfffaee : 0xf0e7d7;
+    const shellWarm = isMoonlight ? 0xf3e0a7 : 0xe2d3b3;
+    const shellStroke = isMoonlight ? 0x726042 : 0x645d4f;
+    const mossAccent = isMoonlight ? 0xffefc7 : 0xc7d8ab;
+    const highlightColor = isMoonlight ? 0xffffff : 0xfff8ea;
+    const accentColor = isMoonlight ? 0xffdf86 : mood.sparkColor;
+    const accentEdgeColor = isMoonlight ? 0x7f6424 : mood.sparkEdgeColor;
     const applyPaint = (
       shape: PaintableShape | undefined,
       fillColor: number,
@@ -761,8 +842,11 @@ export class RunnerLoopSystem {
       shape?.setFillStyle(fillColor, fillAlpha).setStrokeStyle(2, strokeColor, strokeAlpha);
     };
 
-    entity.container.setScale((hoverScale + this.chainBurst * 0.032) * 1.08);
-    entity.halo?.setFillStyle(mood.sparkColor, mood.sparkHaloAlpha * 0.42 + this.chainBurst * 0.028);
+    entity.container.setScale((hoverScale + this.chainBurst * (isMoonlight ? 0.05 : 0.032)) * 1.08);
+    entity.halo?.setFillStyle(
+      isMoonlight ? 0xffe6a6 : mood.sparkColor,
+      (isMoonlight ? 0.22 : mood.sparkHaloAlpha * 0.42) + this.chainBurst * (isMoonlight ? 0.06 : 0.028)
+    );
 
     if (entity.variant === 'spark') {
       applyPaint(entity.primary[0], shellWarm, 0.98, shellStroke, 0.26);
@@ -771,8 +855,8 @@ export class RunnerLoopSystem {
       applyPaint(entity.primary[3], shellColor, 0.98, shellStroke, 0.24);
       applyPaint(entity.primary[4], mossAccent, 0.94, shellStroke, 0.18);
       applyPaint(entity.primary[5], shellColor, 0.96, shellStroke, 0.2);
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
-      applyPaint(entity.secondary[1], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[0], accentColor, 0.96, accentEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], accentColor, 0.96, accentEdgeColor, 0.22);
       applyPaint(entity.secondary[2], highlightColor, 0.92, shellStroke, 0.08);
       applyPaint(entity.secondary[3], highlightColor, 0.78, shellStroke, 0.04);
       return;
@@ -784,7 +868,7 @@ export class RunnerLoopSystem {
       applyPaint(entity.primary[2], mossAccent, 0.94, shellStroke, 0.16);
       applyPaint(entity.primary[3], shellColor, 0.96, shellStroke, 0.18);
       applyPaint(entity.primary[4], shellWarm, 0.92, shellStroke, 0.12);
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[0], accentColor, 0.96, accentEdgeColor, 0.22);
       applyPaint(entity.secondary[1], highlightColor, 0.92, shellStroke, 0.08);
       applyPaint(entity.secondary[2], highlightColor, 0.76, shellStroke, 0.04);
       return;
@@ -797,8 +881,8 @@ export class RunnerLoopSystem {
       applyPaint(entity.primary[3], mossAccent, 0.94, shellStroke, 0.16);
       applyPaint(entity.primary[4], shellColor, 0.96, shellStroke, 0.18);
       applyPaint(entity.primary[5], shellWarm, 0.92, shellStroke, 0.16);
-      applyPaint(entity.secondary[0], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
-      applyPaint(entity.secondary[1], mood.sparkColor, 0.96, mood.sparkEdgeColor, 0.22);
+      applyPaint(entity.secondary[0], accentColor, 0.96, accentEdgeColor, 0.22);
+      applyPaint(entity.secondary[1], accentColor, 0.96, accentEdgeColor, 0.22);
       applyPaint(entity.secondary[2], highlightColor, 0.92, shellStroke, 0.08);
       applyPaint(entity.secondary[3], highlightColor, 0.76, shellStroke, 0.04);
       return;
@@ -858,6 +942,43 @@ export class RunnerLoopSystem {
       return;
     }
 
+    if (entity.variant === 'shard') {
+      entity.container.setScale(1 + Math.abs(sway) * 0.18, 1);
+      applyPaint(entity.primary[0], 0x0c0a18, 0.36, 0x04050a, 0.22, 1);
+      applyPaint(entity.primary[1], 0x584c82, 0.98, 0x1d1830, 0.76, 3);
+      applyPaint(entity.primary[2], 0xa89de3, 0.98, 0x3d3563, 0.72, 3);
+      applyPaint(entity.primary[3], 0x7769bd, 0.98, 0x2b2548, 0.72, 3);
+      applyPaint(entity.secondary[0], 0xffffff, 0.92, 0xd8d4ff, 0.26, 1);
+      applyPaint(entity.secondary[1], 0xf8f5ff, 0.98, 0xe7e2ff, 0.24, 1);
+      applyPaint(entity.secondary[2], 0xffcaea, 0.26, 0xb96ca6, 0.18, 1);
+      return;
+    }
+
+    if (entity.variant === 'mirror') {
+      entity.container.setScale(1 + Math.abs(sway) * 0.16, 1 + Math.abs(sway) * 0.03);
+      applyPaint(entity.primary[0], 0x0b0a18, 0.34, 0x04050a, 0.18, 1);
+      applyPaint(entity.primary[1], 0x65568d, 0.98, 0x211938, 0.74, 3);
+      applyPaint(entity.primary[2], 0xc4b9f4, 0.98, 0x483d76, 0.7, 3);
+      applyPaint(entity.primary[3], 0x4a466a, 0.98, 0x19182a, 0.58, 2);
+      applyPaint(entity.secondary[0], 0xffffff, 0.96, 0xdfd8ff, 0.24, 1);
+      applyPaint(entity.secondary[1], 0xf0e7ff, 0.32, 0xb8a7e8, 0.16, 1);
+      applyPaint(entity.secondary[2], 0xfff8ff, 0.94, 0xf0e8ff, 0.18, 1);
+      return;
+    }
+
+    if (entity.variant === 'crown') {
+      entity.container.setScale(1 + Math.abs(sway) * 0.22, 1 - Math.abs(sway) * 0.02);
+      applyPaint(entity.primary[0], 0x0a0a18, 0.32, 0x04050a, 0.18, 1);
+      applyPaint(entity.primary[1], 0x5a4f86, 0.98, 0x1f1933, 0.72, 3);
+      applyPaint(entity.primary[2], 0xa99fe6, 0.98, 0x40376a, 0.72, 3);
+      applyPaint(entity.primary[3], 0x8372c9, 0.98, 0x302853, 0.7, 3);
+      applyPaint(entity.primary[4], 0x413d64, 0.98, 0x171626, 0.56, 2);
+      applyPaint(entity.secondary[0], 0xfcfbff, 0.86, 0xddd7ff, 0.24, 1);
+      applyPaint(entity.secondary[1], 0xffffff, 0.98, 0xefebff, 0.24, 1);
+      applyPaint(entity.secondary[2], 0xffd2ef, 0.22, 0xc07baa, 0.18, 1);
+      return;
+    }
+
     entity.container.setScale(1 + Math.abs(sway) * 0.28, 1 - Math.abs(sway) * 0.04);
     applyPaint(entity.primary[0], 0x080a0d, 0.4, 0x040507, 0.2, 1);
     applyPaint(entity.primary[1], 0x23303a, 0.98, 0x10161b, 0.62, 3);
@@ -893,33 +1014,39 @@ export class RunnerLoopSystem {
   }
 
   private getLevelProgress() {
+    const level = this.stage.runner.level;
+
     return Phaser.Math.Clamp(
-      this.distanceTravelled / runnerConfig.level.endDistance,
+      this.distanceTravelled / level.endDistance,
       0,
       1
     );
   }
 
   private getSurfaceProgress() {
+    const level = this.stage.runner.level;
+
     return Phaser.Math.Clamp(
-      (this.distanceTravelled - runnerConfig.level.surfaceStartDistance) /
-        (runnerConfig.level.endDistance - runnerConfig.level.surfaceStartDistance),
+      (this.distanceTravelled - level.surfaceStartDistance) /
+        (level.endDistance - level.surfaceStartDistance),
       0,
       1
     );
   }
 
   private getFinishRevealProgress() {
+    const level = this.stage.runner.level;
+
     return Phaser.Math.Clamp(
-      (this.distanceTravelled - runnerConfig.level.finishRevealDistance) /
-        (runnerConfig.level.endDistance - runnerConfig.level.finishRevealDistance),
+      (this.distanceTravelled - level.finishRevealDistance) /
+        (level.endDistance - level.finishRevealDistance),
       0,
       1
     );
   }
 
   private isLevelComplete() {
-    return this.distanceTravelled >= runnerConfig.level.endDistance;
+    return this.distanceTravelled >= this.stage.runner.level.endDistance;
   }
 
   private projectLandingScreenX() {

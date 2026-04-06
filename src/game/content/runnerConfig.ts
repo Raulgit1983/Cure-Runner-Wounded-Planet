@@ -48,9 +48,9 @@ export const runnerConfig = {
     speedPenalty: 0.22
   },
   level: {
-    endDistance: 3340,
-    surfaceStartDistance: 2280,
-    finishRevealDistance: 2860,
+    endDistance: 9120,
+    surfaceStartDistance: 5680,
+    finishRevealDistance: 7880,
     finishSlowdownDistance: 260,
     exitCoastDistance: 120
   },

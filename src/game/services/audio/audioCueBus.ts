@@ -4,6 +4,9 @@ export type AudioCueType =
   | 'pulse_drop'
   | 'awakening_gain'
   | 'reserve_fill'
+  | 'reserve_spent'
+  | 'shark_touch'
+  | 'awakening_touch'
   | 'victory_win'
   | 'jump_player';
 

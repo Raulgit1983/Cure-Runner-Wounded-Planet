@@ -175,12 +175,90 @@ class ReactiveAudioLayer {
       return;
     }
 
+    if (event.type === 'shark_touch') {
+      this.playTone(context, master, {
+        from: 620,
+        to: 920,
+        duration: 0.1,
+        volume: 0.028,
+        type: 'sine',
+        attack: 0.006
+      });
+      this.playTone(context, master, {
+        from: 940,
+        to: 1320,
+        duration: 0.16,
+        delay: 0.03,
+        volume: 0.03,
+        type: 'triangle',
+        attack: 0.007
+      });
+      this.playTone(context, master, {
+        from: 1480,
+        to: 1880,
+        duration: 0.2,
+        delay: 0.07,
+        volume: 0.02,
+        type: 'sine',
+        attack: 0.01
+      });
+      this.playTone(context, master, {
+        from: 1760,
+        to: 2280,
+        duration: 0.22,
+        delay: 0.12,
+        volume: 0.012,
+        type: 'triangle',
+        attack: 0.014
+      });
+      return;
+    }
+
+    if (event.type === 'awakening_touch') {
+      this.playTone(context, master, {
+        from: 460,
+        to: 620,
+        duration: 0.13,
+        volume: 0.026,
+        type: 'sine',
+        attack: 0.008
+      });
+      this.playTone(context, master, {
+        from: 740,
+        to: 1180,
+        duration: 0.24,
+        delay: 0.03,
+        volume: 0.03,
+        type: 'triangle',
+        attack: 0.009
+      });
+      this.playTone(context, master, {
+        from: 1180,
+        to: 1580,
+        duration: 0.32,
+        delay: 0.09,
+        volume: 0.026,
+        type: 'sine',
+        attack: 0.012
+      });
+      this.playTone(context, master, {
+        from: 1580,
+        to: 2120,
+        duration: 0.42,
+        delay: 0.16,
+        volume: 0.016,
+        type: 'triangle',
+        attack: 0.016
+      });
+      return;
+    }
+
     if (event.type === 'victory_win') {
       this.playTone(context, master, {
         from: 392,
         to: 523,
         duration: 0.18,
-        volume: 0.03,
+        volume: 0.032,
         type: 'sine'
       });
       this.playTone(context, master, {
@@ -188,7 +266,7 @@ class ReactiveAudioLayer {
         to: 659,
         duration: 0.22,
         delay: 0.08,
-        volume: 0.028,
+        volume: 0.03,
         type: 'triangle'
       });
       this.playTone(context, master, {
@@ -196,8 +274,17 @@ class ReactiveAudioLayer {
         to: 784,
         duration: 0.28,
         delay: 0.16,
-        volume: 0.024,
+        volume: 0.026,
         type: 'sine'
+      });
+      this.playTone(context, master, {
+        from: 784,
+        to: 1174,
+        duration: 0.36,
+        delay: 0.22,
+        volume: 0.02,
+        type: 'triangle',
+        attack: 0.014
       });
       return;
     }

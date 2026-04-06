@@ -35,7 +35,7 @@ app.innerHTML = `
             ${isFirstRun ? `
             <div class="entry-flow__framing" aria-label="Misión">
               <p class="entry-flow__framing-line">El planeta está herido.<br>Entra en su interior.</p>
-              <p class="entry-flow__framing-line entry-flow__framing-line--mission">Salta, recoge notas.<br>Devuelve pulso.</p>
+              <p class="entry-flow__framing-line entry-flow__framing-line--mission">Salta, recoge notas.<br>Devuelve la luz.</p>
             </div>
             ` : `
             <p class="entry-flow__tagline">El planeta aún respira.</p>
@@ -46,7 +46,7 @@ app.innerHTML = `
           <span class="entry-shell__callout" id="entry-loading">
             <span class="entry-shell__eyebrow">Nivel 1 · Wounded Planet</span>
             <strong class="entry-shell__title" data-role="entry-title">Abriendo el interior</strong>
-            <span class="entry-shell__copy" data-role="entry-copy">Las notas llenan tu reserva.</span>
+            <span class="entry-shell__copy" data-role="entry-copy">Las notas llenan la reserva.</span>
             <span class="entry-shell__loader" aria-hidden="true">
               <span></span>
               <span></span>

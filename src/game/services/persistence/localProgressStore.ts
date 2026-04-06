@@ -40,5 +40,13 @@ export const localProgressStore = {
         collectedSparks: Math.max(0, Math.floor(snapshot.collectedSparks))
       })
     );
+  },
+
+  clear() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.removeItem(STORAGE_KEY);
   }
 };

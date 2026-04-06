@@ -27,7 +27,7 @@ export const createHud = (root: HTMLElement) => {
     <div class="hud__row hud__row--compact">
       <div class="hud__pulse">
         <div class="hud__pulse-copy">
-          <span class="hud__eyebrow">Vida</span>
+          <span class="hud__eyebrow">Aire</span>
           <strong class="hud__value" data-role="progress">0%</strong>
         </div>
         <div class="spark-meter" aria-hidden="true">
@@ -35,7 +35,7 @@ export const createHud = (root: HTMLElement) => {
         </div>
       </div>
       <div class="hud__notes">
-        <span class="hud__eyebrow">Reserva</span>
+        <span class="hud__eyebrow" data-role="notes-label">Reserva</span>
         <strong class="hud__value" data-role="count">0/100</strong>
       </div>
     </div>
@@ -49,6 +49,7 @@ export const createHud = (root: HTMLElement) => {
   const meter = root.querySelector<HTMLElement>('[data-role="meter"]');
   const hint = root.querySelector<HTMLElement>('[data-role="hint"]');
   const count = root.querySelector<HTMLElement>('[data-role="count"]');
+  const notesLabel = root.querySelector<HTMLElement>('[data-role="notes-label"]');
   const telemetry = root.querySelector<HTMLElement>('[data-role="telemetry"]');
   const runtime = root.querySelector<HTMLElement>('[data-role="runtime"]');
   const audit = root.querySelector<HTMLElement>('[data-role="audit"]');
@@ -124,9 +125,9 @@ export const createHud = (root: HTMLElement) => {
       state.currentPulse <= 0.34
         ? 'Busca aire.'
         : state.recoveryChances > 0
-          ? 'Reserva activa.'
+          ? 'Reserva lista.'
           : state.noteProgress > 0
-            ? 'Reserva creciendo.'
+            ? 'La reserva crece.'
             : 'Toca para saltar.';
     hintBaseOpacity =
       state.currentPulse <= 0.34
@@ -229,17 +230,27 @@ export const createHud = (root: HTMLElement) => {
     latestState = state;
     progress.textContent = renderPulse(state);
     meter.style.width = `${Math.round(state.currentPulse * 100)}%`;
+    if (notesLabel) {
+      notesLabel.textContent =
+        state.recoveryChances > 0 ? `Reserva x${state.recoveryChances}` : 'Reserva';
+    }
     
     const now = Date.now();
     if (now > textOverrideUntil) {
       count.textContent = `${state.noteProgress}/100`;
     }
 
-    if (state.recoveryChances > lastRecoveryChances && lastRecoveryChances > 0) {
+    if (state.recoveryChances > lastRecoveryChances) {
       notes?.classList.remove('hud__notes--pulse', 'hud__notes--full-burst');
       if (notes) void notes.offsetWidth;
       notes?.classList.add('hud__notes--full-burst');
-      count.textContent = 'MÁX';
+      count.textContent = 'LISTA';
+      textOverrideUntil = now + 1100;
+    } else if (state.recoveryChances < lastRecoveryChances) {
+      notes?.classList.remove('hud__notes--pulse', 'hud__notes--full-burst');
+      if (notes) void notes.offsetWidth;
+      notes?.classList.add('hud__notes--full-burst');
+      count.textContent = 'USADA';
       textOverrideUntil = now + 900;
     } else if (state.noteProgress > lastNoteProgress && (now > textOverrideUntil)) {
       notes?.classList.remove('hud__notes--pulse', 'hud__notes--full-burst');

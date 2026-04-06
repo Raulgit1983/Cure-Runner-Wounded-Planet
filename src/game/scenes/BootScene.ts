@@ -43,7 +43,7 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     this.statusText?.setText('Abriendo el interior...');
-    this.hintText?.setText('Las notas llenan tu reserva.');
+    this.hintText?.setText('Las notas llenan la reserva.');
     this.renderProgress(0.82);
     this.time.delayedCall(16, () => {
       void this.startJourney();
@@ -79,7 +79,7 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hintText = this.add
-      .text(centerX, centerY + 52, 'Las notas llenan tu reserva.', {
+      .text(centerX, centerY + 52, 'Las notas llenan la reserva.', {
         fontFamily: 'Avenir Next, Trebuchet MS, Verdana, sans-serif',
         fontSize: '11px',
         color: '#d5d8df'
